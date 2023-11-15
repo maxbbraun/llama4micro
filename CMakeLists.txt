@@ -17,8 +17,8 @@ include_directories(llama2.c)
 add_executable_m7(llama4micro
     main.cc
     DATA
-    ${PROJECT_SOURCE_DIR}/llama2.c/stories15M_q80.bin
-    ${PROJECT_SOURCE_DIR}/llama2.c/tokenizer.bin
+    ${PROJECT_SOURCE_DIR}/data/stories15M_q80.bin
+    ${PROJECT_SOURCE_DIR}/data/tokenizer.bin
 )
 
 target_link_libraries(llama4micro

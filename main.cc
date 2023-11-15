@@ -14,8 +14,8 @@ using namespace coralmicro;
 const uint64_t kButtonDebounceUs = 50000;
 
 // Model data paths.
-const char* kModelPath = "/llama2.c/stories15M_q80.bin";
-const char* kTokenizerPath = "/llama2.c/tokenizer.bin";
+const char* kModelPath = "/data/stories15M_q80.bin";
+const char* kTokenizerPath = "/data/tokenizer.bin";
 
 // Model inference parameters.
 const float kTemperature = 1.0f;

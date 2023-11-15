@@ -22,32 +22,33 @@ git clone --recurse-submodules https://github.com/maxbbraun/llama4micro.git
 cd llama4micro
 ```
 
+Some of the tools use Python. Install their dependencies:
+
+```bash
+python3 -m venv venv
+. venv/bin/activate
+
+pip install -r llama2.c/requirements.txt
+pip install -r coralmicro/scripts/requirements.txt
+
+```
+
 Download the model and quantize it:
 
 ```bash
-cd llama2.c
-
 MODEL_NAME=stories15M
-wget https://huggingface.co/karpathy/tinyllamas/resolve/main/${MODEL_NAME}.pt
+wget -P data https://huggingface.co/karpathy/tinyllamas/resolve/main/${MODEL_NAME}.pt
 
-python3 -m venv venv
-. venv/bin/activate
-pip install -r requirements.txt
+python llama2.c/export.py data/${MODEL_NAME}_q80.bin --version 2 --checkpoint data/${MODEL_NAME}.pt
 
-python export.py ${MODEL_NAME}_q80.bin --version 2 --checkpoint ${MODEL_NAME}.pt
+cp llama2.c/tokenizer.bin data/tokenizer.bin
 ```
 
 Build and flash the image:
 
 ```bash
-cd ..
-
 mkdir build
 cd build
-
-python3 -m venv venv
-. venv/bin/activate
-pip install -r ../coralmicro/scripts/requirements.txt
 
 cmake ..
 make -j

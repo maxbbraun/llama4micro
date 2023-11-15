@@ -6,3 +6,7 @@ build
 
 # Python
 venv
+__pycache__
+
+# Model data
+data
