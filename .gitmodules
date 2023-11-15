@@ -1,0 +1,6 @@
+[submodule "coralmicro"]
+	path = coralmicro
+	url = git@github.com:maxbbraun/coralmicro.git
+[submodule "llama2.c"]
+	path = llama2.c
+	url = git@github.com:karpathy/llama2.c.git
