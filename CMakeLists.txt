@@ -14,6 +14,11 @@ add_subdirectory(coralmicro)
 
 include_directories(llama2.c)
 
+set(ADD_EXECUTABLE_M7_LINKER_SCRIPT
+    ${PROJECT_SOURCE_DIR}/MIMXRT1176xxxxx_cm7_ram.ld
+    CACHE INTERNAL ""
+)
+
 add_executable_m7(llama4micro
     main.cc
     DATA

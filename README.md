@@ -14,7 +14,7 @@ The LLM implementation itself is an adaptation of [llama2.c](https://github.com/
 
 ## Setup
 
-Clone this repo with its submodules [`karpathy/llama2.c`](https://github.com/karpathy/llama2.c) (specifically the 8-bit quantized version) and [`maxbbraun/coralmicro`](https://github.com/maxbbraun/coralmicro) (a fork to [maximize heap size](https://github.com/maxbbraun/coralmicro/commit/800054caf3eb61148da0d6d52f48f4824151a671)):
+Clone this repo with its submodules [`karpathy/llama2.c`](https://github.com/karpathy/llama2.c) and [`google-coral/coralmicro`](https://github.com/google-coral/coralmicro):
 
 ```bash
 git clone --recurse-submodules https://github.com/maxbbraun/llama4micro.git
