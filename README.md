@@ -36,12 +36,12 @@ pip install -r coralmicro/scripts/requirements.txt
 Download the model and quantize it:
 
 ```bash
-MODEL_NAME=stories15M
-wget -P data https://huggingface.co/karpathy/tinyllamas/resolve/main/${MODEL_NAME}.pt
+LLAMA_MODEL_NAME=stories15M
+wget -P data https://huggingface.co/karpathy/tinyllamas/resolve/main/${LLAMA_MODEL_NAME}.pt
 
-python llama2.c/export.py data/${MODEL_NAME}_q80.bin --version 2 --checkpoint data/${MODEL_NAME}.pt
+python llama2.c/export.py data/${LLAMA_MODEL_NAME}_q80.bin --version 2 --checkpoint data/${LLAMA_MODEL_NAME}.pt
 
-cp llama2.c/tokenizer.bin data/tokenizer.bin
+cp llama2.c/tokenizer.bin data/
 ```
 
 Build and flash the image:

@@ -1,4 +1,4 @@
-#include <string>
+#include <vector>
 
 #include "libs/base/filesystem.h"
 #include "libs/base/gpio.h"
@@ -11,38 +11,39 @@
 
 using namespace coralmicro;
 
-const uint64_t kButtonDebounceUs = 50000;
+// Llama model data paths.
+const char* kLlamaModelPath = "/data/stories15M_q80.bin";
+const char* kLlamaTokenizerPath = "/data/tokenizer.bin";
 
-// Model data paths.
-const char* kModelPath = "/data/stories15M_q80.bin";
-const char* kTokenizerPath = "/data/tokenizer.bin";
-
-// Model inference parameters.
+// Llama model inference parameters.
 const float kTemperature = 1.0f;
 const float kTopP = 0.9f;
 const int kSteps = 256;
 const char* kPrompt = nullptr;
 
-// Model data.
+// Llama model data.
 Transformer transformer;
-std::string model_buffer;
+std::vector<uint8_t> llama_model_buffer;
 int group_size;
 int steps = kSteps;
 Tokenizer tokenizer;
-std::string tokenizer_buffer;
+std::vector<uint8_t> llama_tokenizer_buffer;
 Sampler sampler;
 
-void LoadModel() {
-  printf(">>> Loading model %s...\n", kModelPath);
+// Debounce interval for the button interrupt.
+const uint64_t kButtonDebounceUs = 50000;
 
+void LoadLlamaModel() {
+  printf(">>> Loading Llama model %s...\n", kLlamaModelPath);
   int64_t load_start = TimerMillis();
 
-  build_transformer(&transformer, kModelPath, &model_buffer, &group_size);
+  build_transformer(&transformer, kLlamaModelPath, &llama_model_buffer,
+                    &group_size);
   if (steps == 0 || steps > transformer.config.seq_len) {
     steps = transformer.config.seq_len;
   }
 
-  build_tokenizer(&tokenizer, kTokenizerPath, &tokenizer_buffer,
+  build_tokenizer(&tokenizer, kLlamaTokenizerPath, &llama_tokenizer_buffer,
                   transformer.config.vocab_size);
 
   unsigned long long rng_seed = xTaskGetTickCount();
@@ -51,12 +52,11 @@ void LoadModel() {
 
   int64_t load_end = TimerMillis();
   float load_s = (load_end - load_start) / 1000.0f;
-
-  printf(">>> Model loading took %.2f s\n", load_s);
+  printf(">>> Llama model loading took %.2f s\n", load_s);
 }
 
-void UnloadModel() {
-  printf(">>> Unloading model...\n");
+void UnloadLlamaModel() {
+  printf(">>> Unloading Llama model...\n");
 
   free_sampler(&sampler);
   free_tokenizer(&tokenizer);
@@ -85,7 +85,7 @@ extern "C" [[noreturn]] void app_main(void* param) {
   // Load the model while showing the status LED.
   LedSet(Led::kStatus, true);
   LedSet(Led::kUser, false);
-  LoadModel();
+  LoadLlamaModel();
 
   while (true) {
     // Wait for a button press while showing the user LED.
@@ -101,5 +101,5 @@ extern "C" [[noreturn]] void app_main(void* param) {
   }
 
   // Unreachable in regular operation. The model stays in memory.
-  UnloadModel();
+  UnloadLlamaModel();
 }

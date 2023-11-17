@@ -3,13 +3,13 @@
 /* Inference for Llama-2 Transformer model in pure C, int8 quantized forward pass. */
 
 #include <math.h>
-#include <string>
+#include <vector>
 
 #include "libs/base/filesystem.h"
 #include "libs/base/timer.h"
 
 // Similar API to fread() for reading from a byte array instead.
-inline void sread(void *buffer, size_t size, char* *stream) {
+inline void sread(void *buffer, size_t size, uint8_t* *stream) {
     memcpy(buffer, *stream, size);
     *stream += size;
 }
@@ -210,13 +210,13 @@ void memory_map_weights(TransformerWeights *w, Config* p, void* ptr, uint8_t sha
     w->wcls = shared_classifier ? w->q_tokens : init_quantized_tensors(&ptr, 1, p->dim * p->vocab_size, gs);
 }
 
-void read_checkpoint(const char* checkpoint, std::string* checkpoint_str, Config* config,
-                     TransformerWeights* weights, float** data, int* group_size) {
-    if (!coralmicro::LfsReadFile(checkpoint, checkpoint_str)) {
+void read_checkpoint(const char* checkpoint, std::vector<uint8_t>* checkpoint_buffer,
+                     Config* config, TransformerWeights* weights, float** data, int* group_size) {
+    if (!coralmicro::LfsReadFile(checkpoint, checkpoint_buffer)) {
         fprintf(stderr, "Couldn't open file %s\n", checkpoint);
         exit(EXIT_FAILURE);
     }
-    char* checkpoint_ptr = checkpoint_str->data();
+    uint8_t* checkpoint_ptr = checkpoint_buffer->data();
     // read in magic number (uint32), has to be 0x616b3432, i.e. "ak42" in ASCII
     uint32_t magic_number;
     sread(&magic_number, sizeof(uint32_t), &checkpoint_ptr);
@@ -234,13 +234,13 @@ void read_checkpoint(const char* checkpoint, std::string* checkpoint_str, Config
     // the group size used in quantization
     sread(group_size, sizeof(int), &checkpoint_ptr);
     // point the Transformer weights at the data pointer
-    *data = (float*)checkpoint_str->data();
+    *data = (float*)checkpoint_buffer->data();
     void* weights_ptr = ((char*)*data) + header_size; // skip header bytes. char is 1 byte
     memory_map_weights(weights, config, weights_ptr, shared_classifier, *group_size);
 }
 
-void build_transformer(Transformer *t, const char* checkpoint_path, std::string* checkpoint_buffer,
-                       int* group_size) {
+void build_transformer(Transformer *t, const char* checkpoint_path,
+                       std::vector<uint8_t>* checkpoint_buffer, int* group_size) {
     // read in the Config and the Weights from the checkpoint
     read_checkpoint(checkpoint_path, checkpoint_buffer, &t->config, &t->weights, &t->data,
                     group_size);
@@ -487,8 +487,8 @@ int compare_tokens(const void *a, const void *b) {
     return strcmp(((TokenIndex*)a)->str, ((TokenIndex*)b)->str);
 }
 
-void build_tokenizer(Tokenizer* t, const char* tokenizer_path, std::string* tokenizer_buffer,
-                     int vocab_size) {
+void build_tokenizer(Tokenizer* t, const char* tokenizer_path,
+                     std::vector<uint8_t>* tokenizer_buffer, int vocab_size) {
     // i should have written the vocab_size into the tokenizer file... sigh
     t->vocab_size = vocab_size;
     // malloc space to hold the scores and the strings
@@ -504,7 +504,7 @@ void build_tokenizer(Tokenizer* t, const char* tokenizer_path, std::string* toke
         fprintf(stderr, "couldn't load %s\n", tokenizer_path);
         exit(EXIT_FAILURE);
     }
-    char* tokenizer_ptr = tokenizer_buffer->data();
+    uint8_t* tokenizer_ptr = tokenizer_buffer->data();
     sread(&t->max_token_length, sizeof(int), &tokenizer_ptr);
     int len;
     for (int i = 0; i < vocab_size; i++) {
