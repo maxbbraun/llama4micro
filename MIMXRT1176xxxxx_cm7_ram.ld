@@ -27,10 +27,11 @@
 /* Entry Point */
 ENTRY(Reset_Handler)
 
-HEAP_SIZE  = DEFINED(__heap_size__)  ? __heap_size__  : 0x03F80000;
+HEAP_SIZE  = DEFINED(__heap_size__)  ? __heap_size__  : 0x03F00000;
 STACK_SIZE = DEFINED(__stack_size__) ? __stack_size__ : 0x0400;
 RPMSG_SHMEM_SIZE = DEFINED(__use_shmem__) ? 0x2000 : 0;
 NCACHE_SIZE = 0x8000;
+TEXT_SIZE = 0x5B400;
 
 /*
  * Valid memory regions:
@@ -44,10 +45,10 @@ NCACHE_SIZE = 0x8000;
 MEMORY
 {
   m_interrupts          (RX)  : ORIGIN = 0x00000800, LENGTH = 0x00000400
-  m_text                (RX)  : ORIGIN = 0x00000c00, LENGTH = 0x0003F400
   m_ncache              (RW)  : ORIGIN = 0x20000000, LENGTH = NCACHE_SIZE
   m_data                (RW)  : ORIGIN = 0x20000000 + NCACHE_SIZE, LENGTH = 0x00040000 - NCACHE_SIZE
-  m_ocram               (RX)  : ORIGIN = 0x20240000, LENGTH = 0x00080000
+  m_text                (RX)  : ORIGIN = 0x20240000, LENGTH = TEXT_SIZE
+  m_ocram               (RX)  : ORIGIN = 0x20240000 + TEXT_SIZE, LENGTH = 0x00080000 - TEXT_SIZE
   rpmsg_sh_mem          (RW)  : ORIGIN = 0x202C0000, LENGTH = RPMSG_SHMEM_SIZE
   m_heap                (RW)  : ORIGIN = 0x80000000, LENGTH = HEAP_SIZE
   m_sdram               (RX)  : ORIGIN = 0x80000000 + HEAP_SIZE, LENGTH = 0x04000000 - HEAP_SIZE
