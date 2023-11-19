@@ -24,6 +24,8 @@ add_executable_m7(llama4micro
     DATA
     ${PROJECT_SOURCE_DIR}/data/stories15M_q80.bin
     ${PROJECT_SOURCE_DIR}/data/tokenizer.bin
+    ${PROJECT_SOURCE_DIR}/data/tf2_mobilenet_v3_edgetpu_1.0_224_ptq_edgetpu.tflite
+    ${PROJECT_SOURCE_DIR}/data/imagenet_labels.txt
 )
 
 target_link_libraries(llama4micro
