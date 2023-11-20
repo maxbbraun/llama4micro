@@ -7,7 +7,6 @@
 #include "libs/base/led.h"
 #include "libs/base/timer.h"
 #include "libs/camera/camera.h"
-#include "libs/tensorflow/classification.h"
 #include "libs/tensorflow/utils.h"
 #include "libs/tpu/edgetpu_manager.h"
 #include "libs/tpu/edgetpu_op.h"
@@ -18,13 +17,14 @@
 #include "third_party/tflite-micro/tensorflow/lite/micro/micro_mutable_op_resolver.h"
 
 #include "llama2.h"
+#include "yolov5.h"
 
 using namespace coralmicro;
 using namespace tflite;
 
 // Llama model data paths.
-const char* kLlamaModelPath = "/data/stories15M_q80.bin";
-const char* kLlamaTokenizerPath = "/data/tokenizer.bin";
+const char* kLlamaModelPath = "/models/llama2/stories15M_q80.bin";
+const char* kLlamaTokenizerPath = "/models/llama2/tokenizer.bin";
 
 // Llama model inference parameters.
 const float kTemperature = 1.0f;
@@ -42,34 +42,35 @@ std::vector<uint8_t>* llama_tokenizer_buffer;
 Sampler sampler;
 
 // Vision model data path.
-const char* kVisionModelPath =
-    "/data/tf2_mobilenet_v3_edgetpu_1.0_224_ptq_edgetpu.tflite";
-const char* kVisionLabelsPath = "/data/imagenet_labels.txt";
+const char* kVisionModelPath = "/models/yolov5/yolov5n-int8_edgetpu.tflite";
+const char* kVisionLabelsPath = "/models/yolov5/coco_labels.txt";
 
 // Vision model data structures.
 std::vector<uint8_t>* vision_model_buffer;
 std::vector<std::string>* vision_labels;
-const size_t kTensorArenaSize = 512 * 1024;
+const size_t kTensorArenaSize = 575 * 1024;
 STATIC_TENSOR_ARENA_IN_SDRAM(tensor_arena, kTensorArenaSize);
 MicroErrorReporter tf_error_reporter;
-MicroMutableOpResolver<1>* tf_resolver;
+MicroMutableOpResolver<4>* tf_resolver;
 MicroInterpreter* tf_interpreter;
 PerformanceMode kTpuPerformanceMode = PerformanceMode::kLow;  // Fast enough.
 std::shared_ptr<EdgeTpuContext> tpu_context;
 
-// Camera configuration.
+// Camera and object detection configuration.
 CameraFrameFormat frame_format;
-const int kDiscardFrames = 10;
-const int kClassifierThreshold = 0.0f;
+const int kDiscardFrames = 30;
+const float kLabelConfidenceThreshold = 0.4f;
+const float kBboxScoreThreshold = 0.2f;
+const float kMinBboxSize = 0.04f;
 
 // Debounce interval for the button interrupt.
 const uint64_t kButtonDebounceUs = 50000;
 
 // Loads the Llama model and tokenizer into memory and sets up data structures.
 void LoadLlamaModel() {
-  printf(">>> Loading Llama model %s...\n", kLlamaModelPath);
   int64_t timer_start = TimerMillis();
 
+  printf(">>> Loading Llama model %s...\n", kLlamaModelPath);
   llama_model_buffer = new std::vector<uint8_t>();
   build_transformer(&transformer, kLlamaModelPath, llama_model_buffer,
                     &group_size);
@@ -77,6 +78,7 @@ void LoadLlamaModel() {
     steps = transformer.config.seq_len;
   }
 
+  printf(">>> Loading Llama tokenizer %s...\n", kLlamaTokenizerPath);
   llama_tokenizer_buffer = new std::vector<uint8_t>();
   build_tokenizer(&tokenizer, kLlamaTokenizerPath, llama_tokenizer_buffer,
                   transformer.config.vocab_size);
@@ -104,10 +106,10 @@ void UnloadLlamaModel() {
 
 // Loads the vision model and labels into memory.
 void LoadVisionModel() {
-  printf(">>> Loading vision model %s...\n", kVisionModelPath);
   int64_t timer_start = TimerMillis();
 
   // Load the model weights.
+  printf(">>> Loading vision model %s...\n", kVisionModelPath);
   vision_model_buffer = new std::vector<uint8_t>();
   if (!LfsReadFile(kVisionModelPath, vision_model_buffer)) {
     printf("ERROR: Failed to load vision model weights: %s\n",
@@ -116,11 +118,11 @@ void LoadVisionModel() {
   }
 
   // Load the model labels.
+  printf(">>> Loading vision labels %s...\n", kVisionLabelsPath);
   std::string vision_labels_buffer;
   vision_labels = new std::vector<std::string>();
   if (!LfsReadFile(kVisionLabelsPath, &vision_labels_buffer)) {
-    printf("ERROR: Failed to load vision model labels: %s\n",
-           kVisionLabelsPath);
+    printf("ERROR: Failed to load vision labels: %s\n", kVisionLabelsPath);
     return;
   }
   std::istringstream labels_stream(vision_labels_buffer);
@@ -138,13 +140,18 @@ void LoadVisionModel() {
     return;
   }
 
+  // TODO: Can vision_model_buffer be discarded once the data is on the TPU?
+  //       Does this enable using the "s" instead of the "n" version of YOLOv5?
+
   // Initialize the TF Lite interpreter.
-  tf_resolver = new MicroMutableOpResolver<1>();
+  tf_resolver = new MicroMutableOpResolver<4>();
   tf_resolver->AddCustom(kCustomOp, RegisterCustomOp());
+  tf_resolver->AddQuantize();
+  tf_resolver->AddConcatenation();
+  tf_resolver->AddReshape();
   tf_interpreter =
-      new MicroInterpreter(GetModel(vision_model_buffer->data()),
-                           *tf_resolver, tensor_arena, kTensorArenaSize,
-                           &tf_error_reporter);
+      new MicroInterpreter(GetModel(vision_model_buffer->data()), *tf_resolver,
+                           tensor_arena, kTensorArenaSize, &tf_error_reporter);
   if (tf_interpreter->AllocateTensors() != kTfLiteOk) {
     printf("ERROR: Failed to allocate tensors\n");
     return;
@@ -208,22 +215,25 @@ std::string TakePicture() {
     return "";
   }
 
-  // Pick just the first result.
-  auto results = tensorflow::GetClassificationResults(tf_interpreter,
-                                                      kClassifierThreshold, 1);
+  // Process the results.
+  auto results = yolo::GetDetectionResults(
+      tf_interpreter, kLabelConfidenceThreshold, kBboxScoreThreshold,
+      kMinBboxSize, vision_labels);
   if (results.empty()) {
     printf("ERROR: No objects detected\n");
     return "";
   }
-  auto result = results[0];
-  std::string label = vision_labels->at(result.id);
-  printf(">>> Found %s (%.2f)\n", label.c_str(), result.score);
+  for (auto result : results) {
+    printf(">>> Found %s (%.2f @ %.2f|%.2f %.2fx%.2f)\n", result.label.c_str(),
+           result.confidence, result.x, result.y, result.width, result.height);
+  }
 
   int64_t timer_stop = TimerMillis();
   float timer_s = (timer_stop - timer_start) / 1000.0f;
   printf(">>> Picture taking took %.2f s\n", timer_s);
 
-  return label;
+  // Use the top result's label.
+  return results[0].label;
 }
 
 // Generates a story beginning with the specified prompt.
@@ -278,7 +288,7 @@ extern "C" [[noreturn]] void app_main(void* param) {
     TellStory(prompt);
   }
 
-  // Unreachable in regular operation. The model stays in memory.
+  // Unreachable in regular operation. The models stay in memory.
   UnloadLlamaModel();
   UnloadVisionModel();
 }
