@@ -61,7 +61,7 @@ CameraFrameFormat frame_format;
 const int kDiscardFrames = 30;
 const float kLabelConfidenceThreshold = 0.4f;
 const float kBboxScoreThreshold = 0.2f;
-const float kMinBboxSize = 0.04f;
+const float kMinBboxSize = 0.1f;
 
 // Debounce interval for the button interrupt.
 const uint64_t kButtonDebounceUs = 50000;
