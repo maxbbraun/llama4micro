@@ -50,11 +50,7 @@ std::vector<uint8_t>* vision_model_buffer;
 std::vector<std::string>* vision_labels;
 const size_t kTensorArenaSize = 575 * 1024;
 STATIC_TENSOR_ARENA_IN_SDRAM(tensor_arena, kTensorArenaSize);
-MicroErrorReporter tf_error_reporter;
-MicroMutableOpResolver<4>* tf_resolver;
-MicroInterpreter* tf_interpreter;
 PerformanceMode kTpuPerformanceMode = PerformanceMode::kLow;  // Fast enough.
-std::shared_ptr<EdgeTpuContext> tpu_context;
 
 // Camera and object detection configuration.
 CameraFrameFormat frame_format;
@@ -131,40 +127,6 @@ void LoadVisionModel() {
     vision_labels->push_back(label);
   }
 
-  // Initialize the TPU.
-  // TODO: Investigate why the TPU context can't just live in the TakePicture()
-  //       scope (which would turn off the TPU while it's not being used).
-  tpu_context = EdgeTpuManager::GetSingleton()->OpenDevice(kTpuPerformanceMode);
-  if (!tpu_context) {
-    printf("ERROR: Failed to get TPU context\n");
-    return;
-  }
-
-  // Initialize the TF Lite interpreter.
-  tf_resolver = new MicroMutableOpResolver<4>();
-  tf_resolver->AddCustom(kCustomOp, RegisterCustomOp());
-  tf_resolver->AddQuantize();
-  tf_resolver->AddConcatenation();
-  tf_resolver->AddReshape();
-  tf_interpreter =
-      new MicroInterpreter(GetModel(vision_model_buffer->data()), *tf_resolver,
-                           tensor_arena, kTensorArenaSize, &tf_error_reporter);
-  if (tf_interpreter->AllocateTensors() != kTfLiteOk) {
-    printf("ERROR: Failed to allocate tensors\n");
-    return;
-  }
-
-  // Initialize the camera capture.
-  auto* input_tensor = tf_interpreter->input_tensor(0);
-  frame_format.fmt = CameraFormat::kRgb;
-  frame_format.filter = CameraFilterMethod::kBilinear;
-  frame_format.rotation = CameraRotation::k270;
-  frame_format.width = input_tensor->dims->data[1];
-  frame_format.height = input_tensor->dims->data[2];
-  frame_format.preserve_ratio = false;
-  frame_format.buffer = GetTensorData<uint8_t>(input_tensor);
-  frame_format.white_balance = true;
-
   int64_t timer_stop = TimerMillis();
   float timer_s = (timer_stop - timer_start) / 1000.0f;
   printf(">>> Vision model loading took %.2f s\n", timer_s);
@@ -174,8 +136,6 @@ void LoadVisionModel() {
 void UnloadVisionModel() {
   printf(">>> Unloading vision model...\n");
 
-  delete tf_resolver;
-  delete tf_interpreter;
   delete vision_model_buffer;
   delete vision_labels;
 }
@@ -195,6 +155,40 @@ std::string TakePicture() {
     return "";
   }
 
+  // Initialize the TPU.
+  auto tpu_context =
+      EdgeTpuManager::GetSingleton()->OpenDevice(kTpuPerformanceMode);
+  if (!tpu_context) {
+    printf("ERROR: Failed to get TPU context\n");
+    return "";
+  }
+
+  // Initialize the TF Lite interpreter.
+  MicroMutableOpResolver<4> tf_resolver;
+  tf_resolver.AddCustom(kCustomOp, RegisterCustomOp());
+  tf_resolver.AddQuantize();
+  tf_resolver.AddConcatenation();
+  tf_resolver.AddReshape();
+  MicroErrorReporter tf_error_reporter;
+  MicroInterpreter tf_interpreter(GetModel(vision_model_buffer->data()),
+                                  tf_resolver, tensor_arena, kTensorArenaSize,
+                                  &tf_error_reporter);
+  if (tf_interpreter.AllocateTensors() != kTfLiteOk) {
+    printf("ERROR: Failed to allocate tensors\n");
+    return "";
+  }
+
+  // Initialize the camera capture.
+  auto* input_tensor = tf_interpreter.input_tensor(0);
+  frame_format.fmt = CameraFormat::kRgb;
+  frame_format.filter = CameraFilterMethod::kBilinear;
+  frame_format.rotation = CameraRotation::k270;
+  frame_format.width = input_tensor->dims->data[1];
+  frame_format.height = input_tensor->dims->data[2];
+  frame_format.preserve_ratio = false;
+  frame_format.buffer = GetTensorData<uint8_t>(input_tensor);
+  frame_format.white_balance = true;
+
   // Discard some frames to get a recent one and give auto exposure more time.
   CameraTask::GetSingleton()->DiscardFrames(10);
   if (!CameraTask::GetSingleton()->GetFrame({frame_format})) {
@@ -207,14 +201,14 @@ std::string TakePicture() {
   CameraTask::GetSingleton()->SetPower(false);
 
   // Run the object vision model on the image.
-  if (tf_interpreter->Invoke() != kTfLiteOk) {
+  if (tf_interpreter.Invoke() != kTfLiteOk) {
     printf("ERROR: Failed to detect objects\n");
     return "";
   }
 
   // Process the results.
   auto results = yolo::GetDetectionResults(
-      tf_interpreter, kLabelConfidenceThreshold, kBboxScoreThreshold,
+      &tf_interpreter, kLabelConfidenceThreshold, kBboxScoreThreshold,
       kMinBboxSize, vision_labels);
   if (results.empty()) {
     printf(">>> Found no objects\n");
