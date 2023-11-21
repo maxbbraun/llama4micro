@@ -140,9 +140,6 @@ void LoadVisionModel() {
     return;
   }
 
-  // TODO: Can vision_model_buffer be discarded once the data is on the TPU?
-  //       Does this enable using the "s" instead of the "n" version of YOLOv5?
-
   // Initialize the TF Lite interpreter.
   tf_resolver = new MicroMutableOpResolver<4>();
   tf_resolver->AddCustom(kCustomOp, RegisterCustomOp());
