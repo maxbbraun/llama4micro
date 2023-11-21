@@ -220,7 +220,7 @@ std::string TakePicture() {
       tf_interpreter, kLabelConfidenceThreshold, kBboxScoreThreshold,
       kMinBboxSize, vision_labels);
   if (results.empty()) {
-    printf("ERROR: No objects detected\n");
+    printf(">>> Found no objects\n");
     return "";
   }
   for (auto result : results) {
