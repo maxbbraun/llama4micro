@@ -5,10 +5,10 @@ TXT_FILE = 'models/yolov5/coco_labels.txt'
 
 # Open the YAML file containing the COCO labels.
 with open(YAML_FILE) as f:
-    coco128_yaml = yaml.safe_load(f)
+    coco_yaml = yaml.safe_load(f)
 
 # Extract the labels from the data structure.
-labels = coco128_yaml['names']
+labels = coco_yaml['names']
 
 print(f'Opened {YAML_FILE} containing {len(labels)} labels.')
 
