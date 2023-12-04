@@ -15,7 +15,7 @@ pip install -r yolov5/requirements.txt
 
 ### Llama
 
-The model used by [llama2.c](https://github.com/karpathy/llama2.c) is based on [Llama 2](https://ai.meta.com/llama/) and the [TinyStories](https://huggingface.co/datasets/roneneldan/TinyStories) dataset. The model weights are from the [tinyllamas](https://huggingface.co/karpathy/tinyllamas/tree/main) repository. We are using the smallest version (with 15M parameters) and quantize it. This model runs on the [Arm Cortex-M7 CPU](https://developer.arm.com/Processors/Cortex-M7).
+The model used by [llama2.c](https://github.com/karpathy/llama2.c) is based on [Llama 2](https://ai.meta.com/llama/) and the [TinyStories](https://huggingface.co/datasets/roneneldan/TinyStories) dataset. The model weights are from the [tinyllamas](https://huggingface.co/karpathy/tinyllamas/tree/main) repository. We are using the [OG version](https://github.com/karpathy/llama2.c#models) (with 15M parameters) and quantize it. This model runs on the [Arm Cortex-M7 CPU](https://developer.arm.com/Processors/Cortex-M7).
 
 
 ```bash
