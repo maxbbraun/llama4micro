@@ -9,6 +9,15 @@ project(llama4micro)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 
+set(CMAKE_CXX_FLAGS_RELEASE
+    "-O3"
+    CACHE STRING "Gotta Go Fast" FORCE
+)
+set(CMAKE_C_FLAGS_RELEASE
+    "-O3"
+    CACHE STRING "Gotta Go Fast" FORCE
+)
+
 include_directories(coralmicro)
 add_subdirectory(coralmicro)
 
