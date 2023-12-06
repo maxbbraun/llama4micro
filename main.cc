@@ -1,4 +1,3 @@
-#include <sstream>
 #include <string>
 #include <vector>
 
@@ -62,6 +61,19 @@ const float kMinBboxSize = 0.1f;
 // Debounce interval for the button interrupt.
 const uint64_t kButtonDebounceUs = 50000;
 
+// Similar to std::getline(), but without using streams. Returns next offset.
+std::size_t getline(const std::string& input, std::string& str,
+                    std::size_t offset = 0, char delim = '\n') {
+  std::size_t pos = input.find(delim, offset);
+  if (pos == std::string::npos) {
+    str = input.substr(offset);
+    return input.size();
+  }
+
+  str = input.substr(offset, pos - offset);
+  return pos + 1;
+}
+
 // Loads the Llama model and tokenizer into memory and sets up data structures.
 void LoadLlamaModel() {
   int64_t timer_start = TimerMillis();
@@ -121,11 +133,12 @@ void LoadVisionModel() {
     printf("ERROR: Failed to load vision labels: %s\n", kVisionLabelsPath);
     return;
   }
-  std::istringstream labels_stream(vision_labels_buffer);
   std::string label;
-  while (std::getline(labels_stream, label)) {
+  std::size_t offset = 0;
+  do {
+    offset = getline(vision_labels_buffer, label, offset);
     vision_labels->push_back(label);
-  }
+  } while (offset < vision_labels_buffer.size());
 
   int64_t timer_stop = TimerMillis();
   float timer_s = (timer_stop - timer_start) / 1000.0f;
@@ -268,8 +281,7 @@ extern "C" [[noreturn]] void app_main(void* param) {
 
     // The label might have multiple comma-separated parts. Pick the first one
     // and combine it with the prompt.
-    std::istringstream label_stream(label);
-    std::getline(label_stream, label, ',');
+    getline(label, label, 0, ',');
     std::string prompt = kPromptPattern;
     prompt += label;
 
