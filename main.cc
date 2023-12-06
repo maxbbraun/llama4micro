@@ -264,7 +264,7 @@ extern "C" [[noreturn]] void app_main(void* param) {
   LedSet(Led::kStatus, true);
   LedSet(Led::kUser, false);
   LoadLlamaModel();
-  LoadVisionModel();
+  // LoadVisionModel();
 
   while (true) {
     // Wait for a button press while showing the user LED.
@@ -275,15 +275,15 @@ extern "C" [[noreturn]] void app_main(void* param) {
 
     // Take a picture while (automatically) showing the camera LED. The result
     // is the label of the main detected object.
-    LedSet(Led::kStatus, false);
-    LedSet(Led::kUser, false);
-    std::string label = TakePicture();
+    // LedSet(Led::kStatus, false);
+    // LedSet(Led::kUser, false);
+    // std::string label = TakePicture();
 
     // The label might have multiple comma-separated parts. Pick the first one
     // and combine it with the prompt.
-    getline(label, label, 0, ',');
+    // getline(label, label, 0, ',');
     std::string prompt = kPromptPattern;
-    prompt += label;
+    // prompt += label;
 
     // Tell a story while showing the status LED.
     LedSet(Led::kStatus, true);
@@ -293,5 +293,5 @@ extern "C" [[noreturn]] void app_main(void* param) {
 
   // Unreachable in regular operation. The models stay in memory.
   UnloadLlamaModel();
-  UnloadVisionModel();
+  // UnloadVisionModel();
 }
