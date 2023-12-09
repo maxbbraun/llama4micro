@@ -14,13 +14,10 @@ add_subdirectory(coralmicro)
 
 include_directories(llama2.c)
 
-set(ADD_EXECUTABLE_M7_LINKER_SCRIPT
-    ${PROJECT_SOURCE_DIR}/MIMXRT1176xxxxx_cm7_ram.ld
-    CACHE INTERNAL ""
-)
-
 add_executable_m7(llama4micro
     main.cc
+    LINKER_SCRIPT
+    ${PROJECT_SOURCE_DIR}/MIMXRT1176xxxxx_cm7_ram.ld
     DATA
     ${PROJECT_SOURCE_DIR}/models/llama2/stories15M_q80.bin
     ${PROJECT_SOURCE_DIR}/models/llama2/tokenizer.bin
