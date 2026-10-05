@@ -107,10 +107,10 @@ std::vector<Object> GetDetectionResults(tflite::MicroInterpreter* interpreter,
   std::vector<Object> raw_results;
   for (int row = 0; row < num_rows; ++row) {
     // YOLOv5 exports [center_x, center_y, width, height, objectness, classes...].
-    float confidence = Dequantize(data[row * row_dims + 4], quantization_params);
+    float objectness = Dequantize(data[row * row_dims + 4], quantization_params);
 
     // Discard low objectness rows, independently of the class threshold below.
-    if (confidence < label_confidence_threshold) {
+    if (objectness < label_confidence_threshold) {
       continue;
     }
 
@@ -154,7 +154,8 @@ std::vector<Object> GetDetectionResults(tflite::MicroInterpreter* interpreter,
     // Assemble the result.
     Object object;
     object.label = labels->at(max_score_label);
-    object.confidence = confidence;
+    // Combine objectness and class score for suppression and reporting.
+    object.confidence = objectness * max_score;
     object.x = x;
     object.y = y;
     object.width = width;
