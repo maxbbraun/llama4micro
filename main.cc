@@ -54,8 +54,10 @@ STATIC_TENSOR_ARENA_IN_SDRAM(tensor_arena, kTensorArenaSize);
 PerformanceMode kTpuPerformanceMode = PerformanceMode::kLow;  // Fast enough.
 
 // Speech model data paths.
-const char* kSpeechFrontModelPath = "/models/sanotts/front_q8.bin";
-const char* kSpeechDecoderModelPath = "/models/sanotts/model_q8.bin";
+const char* kSpeechFrontModelPath = "/models/sanotts/front_f32.bin";
+const char* kSpeechPrefixModelPath =
+    "/models/sanotts/amy_prefix_edgetpu.tflite";
+const char* kSpeechTailModelPath = "/models/sanotts/amy_tail_edgetpu.tflite";
 
 // Camera and object detection configuration.
 CameraFrameFormat frame_format;
@@ -148,7 +150,8 @@ void UnloadVisionModel() {
 // Loads the speech model weights into memory.
 bool LoadSpeechModel() {
   int64_t timer_start = TimerMillis();
-  if (!speech::LoadModel(kSpeechFrontModelPath, kSpeechDecoderModelPath)) {
+  if (!speech::LoadModel(kSpeechFrontModelPath, kSpeechPrefixModelPath,
+                         kSpeechTailModelPath)) {
     return false;
   }
   float timer_s = (TimerMillis() - timer_start) / 1000.0f;

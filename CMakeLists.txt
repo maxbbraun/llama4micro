@@ -18,9 +18,9 @@ add_executable_m7(llama4micro
     main.cc
     speech/speech.cc
     speech/dac_playback.cc
-    speech/heartnano_convert.cc
-    sanoTTS/mcu/src/snt_nano.c
-    sanoTTS/mcu/src/snt_kernels_ref.c
+    speech/amy_convert.cc
+    speech/amy_model.cc
+    sanoTTS/mcu/src/snt_front_f32.c
     sanoTTS/esphome/g2p/lex/nano_lex_g2p.c
     sanoTTS/esphome/g2p/lex/nano_lex_tables.c
     coralmicro/third_party/nxp/rt1176-sdk/devices/MIMXRT1176/drivers/fsl_pit.c
@@ -31,8 +31,9 @@ add_executable_m7(llama4micro
     ${PROJECT_SOURCE_DIR}/models/llama2/tokenizer.bin
     ${PROJECT_SOURCE_DIR}/models/yolov5/yolov5n-int8_edgetpu.tflite
     ${PROJECT_SOURCE_DIR}/models/yolov5/coco_labels.txt
-    ${PROJECT_SOURCE_DIR}/models/sanotts/front_q8.bin
-    ${PROJECT_SOURCE_DIR}/models/sanotts/model_q8.bin
+    ${PROJECT_SOURCE_DIR}/models/sanotts/front_f32.bin
+    ${PROJECT_SOURCE_DIR}/models/sanotts/amy_prefix_edgetpu.tflite
+    ${PROJECT_SOURCE_DIR}/models/sanotts/amy_tail_edgetpu.tflite
 )
 
 target_link_libraries(llama4micro
@@ -41,7 +42,6 @@ target_link_libraries(llama4micro
 
 target_include_directories(llama4micro PRIVATE
     sanoTTS/mcu/include
-    sanoTTS/mcu/models/en_us_e13b
     sanoTTS/esphome/g2p/lex
 )
 

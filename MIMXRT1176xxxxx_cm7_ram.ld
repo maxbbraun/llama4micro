@@ -240,7 +240,7 @@ SECTIONS
   .speech_data :
   {
     *nano_lex_*.obj(.rodata* .text*)
-    *snt_nano.c.obj(.rodata* .text*)
+    *amy_model.cc.obj(.rodata* .text*)
   } > m_sdram
 
   /* The program code and other data goes into internal RAM */

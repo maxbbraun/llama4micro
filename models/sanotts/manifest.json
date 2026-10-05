@@ -1,0 +1,66 @@
+{
+  "voice": "Amy Small",
+  "source": {
+    "repository": "ampixa/sanoTTS",
+    "revision": "c532a5d21c078a16cb633718e9182bfd71a5b760",
+    "directory": "amy-en-1p1m",
+    "weights_sha256": "b45240e7c24ac4ca4a1572a7ccc971dcca1836dcfde9aeb205d54d5515a07610",
+    "license_declaration": "GPL-3.0 in the pinned Hugging Face model card"
+  },
+  "sanotts_revision": "3de9f37cbfedb8a1edcc28f4c8139979c6fcf889",
+  "sample_rate": 22050,
+  "duration_length_scale": 1.08,
+  "latent_hop": 256,
+  "chunk_frames": 10,
+  "prefix_input": [
+    1,
+    1,
+    32,
+    192
+  ],
+  "prefix_output": [
+    1,
+    1,
+    2048,
+    40
+  ],
+  "tail_input": [
+    1,
+    1,
+    666,
+    40
+  ],
+  "tail_output": [
+    1,
+    1,
+    2664,
+    1
+  ],
+  "tail_cpu_postprocessing": "tanh",
+  "build": {
+    "preparation_numpy": "2.3.5",
+    "preparation_platform": "macOS arm64",
+    "tensorflow": "2.15.0",
+    "conversion_numpy": "1.26.2",
+    "flatbuffers": "23.5.26",
+    "conversion_platform": "Linux x86-64",
+    "edgetpu_compiler": "14.1.317412892"
+  },
+  "assets": {
+    "front_f32.bin": {
+      "bytes": 1417572,
+      "sha256": "f02528441a16dedb3ba9b6b283ed3193973af09f686e71b48ce0faaf11917836",
+      "fnv1a32": "7b66c9a5"
+    },
+    "amy_prefix_edgetpu.tflite": {
+      "bytes": 1155648,
+      "sha256": "4ea2ceb9278a66ec35568fd4c6b5615495d181fda796c672858e08c683f3c823",
+      "fnv1a32": "7800530c"
+    },
+    "amy_tail_edgetpu.tflite": {
+      "bytes": 143936,
+      "sha256": "57865148e28b6c7e869306442b7af5aba357f91daab98ed0ef682967d29a4cdc",
+      "fnv1a32": "5768004b"
+    }
+  }
+}

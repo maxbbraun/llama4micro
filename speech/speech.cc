@@ -1,36 +1,21 @@
 #include "speech.h"
 
-#include <algorithm>
-#include <cmath>
 #include <cstdint>
 #include <cstdio>
-#include <cstdlib>
 #include <cstring>
 #include <string>
-#include <vector>
 
+#include "amy_convert.h"
+#include "amy_model.h"
 #include "dac_playback.h"
-#include "heartnano_convert.h"
-#include "libs/base/filesystem.h"
 #include "libs/base/tasks.h"
-#include "libs/base/timer.h"
-#include "nano_q8_meta.h"
-#include "snt_nano.h"
-#include "snt_port.h"
 #include "third_party/freertos_kernel/include/FreeRTOS.h"
 #include "third_party/freertos_kernel/include/queue.h"
 #include "third_party/freertos_kernel/include/semphr.h"
 #include "third_party/freertos_kernel/include/task.h"
 
-extern "C" void snt_par_run(snt_par_fn fn, int n, void* ctx) { fn(0, n, ctx); }
-extern "C" int snt_scratch_id() { return 0; }
-extern "C" int64_t snt_now_us() { return coralmicro::TimerMicros(); }
-
 namespace {
 
-constexpr size_t kArenaBytes = 1024 * 1024;
-constexpr uint32_t kRate = audio_playback::kSampleRate;
-constexpr size_t kMaxSamples = 24 * kRate;
 constexpr size_t kChunkChars = 120;
 constexpr size_t kMaxChunkChars = 480;
 constexpr UBaseType_t kQueueDepth = 2;
@@ -57,43 +42,22 @@ bool producer_ok = true;    // Producer task only.
 // Published by the worker before giving the completion semaphore.
 volatile bool completed_ok = true;
 std::string pending;
-std::vector<uint8_t> front_model_buffer;
-std::vector<uint8_t> decoder_model_buffer;
-const uint8_t* speech_front = nullptr;
-const uint8_t* speech_decoder = nullptr;
+bool playback_active = false;  // Speech worker, or the synchronous producer.
 
-bool LoadBlob(const char* path, size_t bytes, std::vector<uint8_t>* buffer,
-              const uint8_t** data) {
-  printf(">>> Loading speech model %s...\n", path);
-  if (coralmicro::LfsSize(path) != static_cast<ssize_t>(bytes)) {
-    printf("ERROR: Missing or incorrectly sized speech model: %s\n", path);
-    return false;
+bool EmitPcm(const float* pcm, size_t count, void*) {
+  if (!playback_active) {
+    if (!audio_playback::Begin()) return false;
+    playback_active = true;
   }
-  // The runtime's weight pointers must be 16-byte aligned.
-  buffer->resize(bytes + 15);
-  auto* aligned = reinterpret_cast<uint8_t*>(
-      (reinterpret_cast<uintptr_t>(buffer->data()) + 15) & ~uintptr_t(15));
-  if (coralmicro::LfsReadFile(path, aligned, bytes) != bytes) {
-    printf("ERROR: Failed to load speech model: %s\n", path);
-    return false;
-  }
-  *data = aligned;
-  return true;
+  return audio_playback::WritePcm(pcm, count);
 }
 
-struct Capture {
-  int16_t* pcm;
-  size_t count;
-};
-int CapturePcm(const float* pcm, int n, void* user) {
-  auto* c = static_cast<Capture*>(user);
-  if (n < 0 || c->count + size_t(n) > kMaxSamples) return 1;
-  for (int i = 0; i < n; ++i) {
-    if (!std::isfinite(pcm[i])) return 1;
-    const float bounded = std::max(-1.0f, std::min(1.0f, pcm[i]));
-    c->pcm[c->count++] = static_cast<int16_t>(std::lrintf(bounded * 32767));
-  }
-  return 0;
+bool FinishPlayback() {
+  const bool ok = !playback_active || audio_playback::Finish();
+  playback_active = false;
+  // Release speech's TPU context before the next camera inference.
+  amy_model::Stop();
+  return ok;
 }
 
 bool HasWord(const char* s) {
@@ -106,15 +70,11 @@ bool HasWord(const char* s) {
 }
 
 bool SayChunk(const std::string& text, int depth) {
-  if (!speech_front || !speech_decoder) {
-    printf("ERROR: Speech model is not loaded.\n");
-    return false;
-  }
   if (!HasWord(text.c_str())) return true;
-  int32_t ids[HEARTNANO_MAX_IDS];
-  const int count = heartnano_text_to_ids(text.c_str(), ids, HEARTNANO_MAX_IDS);
+  int32_t ids[amy_model::kMaxIds];
+  const int count = amy_text_to_ids(text.c_str(), ids, amy_model::kMaxIds);
   if (count < 0) {
-    // A long clause or spelled-out name can exceed the neural model's 207 IDs.
+    // A long clause or spelled-out name can exceed the neural model's 265 IDs.
     // Retry smaller word-aligned pieces; never silently truncate the sentence.
     const size_t mid = text.size() / 2;
     size_t split = text.rfind(' ', mid);
@@ -128,36 +88,11 @@ bool SayChunk(const std::string& text, int depth) {
     printf("ERROR: Speech frontend failed (%d).\n", count);
     return false;
   }
-  void* raw = malloc(kArenaBytes + 15);
-  Capture capture{static_cast<int16_t*>(malloc(kMaxSamples * sizeof(int16_t))),
-                  0};
-  if (!raw || !capture.pcm) {
-    free(raw);
-    free(capture.pcm);
-    printf("ERROR: Could not allocate speech buffers.\n");
-    return false;
-  }
-  snt_nano_config cfg{};
-  cfg.front_blob = speech_front;
-  cfg.dec_blob = speech_decoder;
-  cfg.arena = reinterpret_cast<void*>((reinterpret_cast<uintptr_t>(raw) + 15) &
-                                      ~uintptr_t(15));
-  cfg.arena_size = kArenaBytes;
-  cfg.noise_seed = 2236265385529901705ULL;
-  snt_nano_stats synth{};
-  const int rc =
-      snt_nano_synthesize(&cfg, ids, count, CapturePcm, &capture, &synth);
-  free(raw);
-  bool ok =
-      rc == 0 && capture.count > 0 && capture.count == size_t(synth.samples);
-  if (!ok) {
-    printf("ERROR: Speech synthesis failed (%d).\n", rc);
-  } else {
-    ok = audio_playback::PlayPcm16(capture.pcm, capture.count);
-    if (!ok) printf("ERROR: Speech playback failed.\n");
-  }
-  free(capture.pcm);
-  return ok;
+  if (!amy_model::Start()) return false;
+  const bool ok = amy_model::Synthesize(ids, count, EmitPcm, nullptr);
+  const bool played = !playback_active || audio_playback::EndUtterance();
+  if (!ok || !played) printf("ERROR: Speech synthesis or playback failed.\n");
+  return ok && played;
 }
 // A barrier is queued after the final sentence. FIFO order plus the semaphore
 // means Flush cannot finish until the DAC has played every preceding sample.
@@ -167,7 +102,8 @@ void Worker(void*) {
   while (true) {
     if (xQueueReceive(work_queue, &item, portMAX_DELAY) != pdPASS) continue;
     if (item.barrier) {
-      completed_ok = batch_ok;
+      const bool played = FinishPlayback();
+      completed_ok = batch_ok && played;
       batch_ok = true;
       xSemaphoreGive(completion);
     } else {
@@ -232,23 +168,13 @@ void SubmitPending() {
 
 namespace speech {
 
-bool LoadModel(const char* front_path, const char* decoder_path) {
+bool LoadModel(const char* front_path, const char* prefix_path,
+               const char* tail_path) {
   if (worker_task) {
     printf("ERROR: Cannot reload the speech model after starting playback.\n");
     return false;
   }
-  speech_front = nullptr;
-  speech_decoder = nullptr;
-  const uint8_t* front = nullptr;
-  const uint8_t* decoder = nullptr;
-  if (!LoadBlob(front_path, NANO_FRONT_BYTES, &front_model_buffer, &front) ||
-      !LoadBlob(decoder_path, NANO_DEC_BYTES, &decoder_model_buffer,
-                &decoder)) {
-    return false;
-  }
-  speech_front = front;
-  speech_decoder = decoder;
-  return true;
+  return amy_model::Load(front_path, prefix_path, tail_path);
 }
 
 bool BeginAsync() {
@@ -299,6 +225,9 @@ bool Flush() {
     async_active = false;
     vTaskPrioritySet(producer_task, producer_priority);
     producer_task = nullptr;
+  } else {
+    const bool played = FinishPlayback();
+    ok = played && ok;
   }
   producer_ok = true;
   return ok;

@@ -4,7 +4,8 @@ namespace speech {
 
 // Load the voice before starting speech. Buffers stay resident for playback;
 // reloading after the worker has started is not supported.
-bool LoadModel(const char* front_path, const char* decoder_path);
+bool LoadModel(const char* front_path, const char* prefix_path,
+               const char* tail_path);
 
 // Call from one producer task. Queues two sentences ahead of playback, and
 // temporarily lowers the producer priority until Flush. Falls back to

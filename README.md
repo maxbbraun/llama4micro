@@ -27,7 +27,7 @@ cd llama4micro
 
 The pre-trained models are in the [`models/`](models/) directory. Refer to the [instructions](models/README.md) on how to download and convert them.
 
-Speech uses [sanoTTS](https://github.com/Ampixa/sanoTTS) on the M7. Connect a [PAM8302 mono amplifier](https://www.adafruit.com/product/2130) and a 4–8Ω speaker:
+Speech uses [sanoTTS](https://github.com/Ampixa/sanoTTS) Amy Small, with the waveform decoder on the Edge TPU and the text and acoustic frontend on the M7. Connect a [PAM8302 mono amplifier](https://www.adafruit.com/product/2130) and a 4–8Ω speaker:
 
 | Amplifier pin | Coral pin |
 |---|---|

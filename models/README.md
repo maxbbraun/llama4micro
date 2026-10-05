@@ -68,10 +68,12 @@ python models/export_coco_labels.py
 
 ### Speech
 
-Speech uses the int8 [heartnano](https://huggingface.co/ampixa/sanoTTS/tree/main/heartnano) voice from [sanoTTS](https://github.com/Ampixa/sanoTTS), running on the Arm Cortex-M7 CPU at a 24 kHz sample rate. The two weight files are copied from the pinned submodule.
+Speech uses [Amy Small](https://huggingface.co/ampixa/sanoTTS/tree/c532a5d21c078a16cb633718e9182bfd71a5b760/amy-en-1p1m), the 1.08M-parameter English voice from [sanoTTS](https://github.com/Ampixa/sanoTTS). Duration and acoustic inference run on the Cortex-M7; two int8 decoder graphs run on the Edge TPU. Output is mono 22,050 Hz. The three shipped files in `models/sanotts/` total about 2.59 MiB:
 
-```bash
-mkdir -p models/sanotts
-cp sanoTTS/web/voices/heartnano/front_q8.bin models/sanotts/
-cp sanoTTS/web/voices/heartnano/model_q8.bin models/sanotts/
-```
+- `front_f32.bin`: duration/acoustic weights, widened losslessly from the upstream FP16 package.
+- `amy_prefix_edgetpu.tflite`: decoder input `[1, 1, 32, 192]`, output `[1, 1, 2048, 40]`.
+- `amy_tail_edgetpu.tflite`: decoder input `[1, 1, 666, 40]`, output `[1, 1, 2664, 1]`, followed by CPU `tanh`.
+
+See [regeneration instructions](sanotts/README.md) for the pinned source, calibration and compiler workflow. Model fingerprints and source revisions are in [sanotts/manifest.json](sanotts/manifest.json).
+
+The pinned Hugging Face model card declares **GPL-3.0**. See [provenance and notices](sanotts/NOTICE.md) and the preserved [source license](sanotts/LICENSE).
