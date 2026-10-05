@@ -17,7 +17,7 @@ The LLM implementation itself is an adaptation of [llama2.c](https://github.com/
 
 ## Setup
 
-Clone this repo with its submodules [`karpathy/llama2.c`](https://github.com/karpathy/llama2.c), [`google-coral/coralmicro`](https://github.com/google-coral/coralmicro), and [`ultralytics/ultralytics`](https://github.com/ultralytics/ultralytics).
+Clone this repo with its submodules [`karpathy/llama2.c`](https://github.com/karpathy/llama2.c), [`google-coral/coralmicro`](https://github.com/google-coral/coralmicro), [`ultralytics/ultralytics`](https://github.com/ultralytics/ultralytics), and [`Ampixa/sanoTTS`](https://github.com/Ampixa/sanoTTS).
 
 ```bash
 git clone --recurse-submodules https://github.com/maxbbraun/llama4micro.git
@@ -26,6 +26,16 @@ cd llama4micro
 ```
 
 The pre-trained models are in the [`models/`](models/) directory. Refer to the [instructions](models/README.md) on how to download and convert them.
+
+Speech uses [sanoTTS](https://github.com/Ampixa/sanoTTS) on the M7. Connect a [PAM8302 mono amplifier](https://www.adafruit.com/product/2130) and a 4–8Ω speaker:
+
+| Amplifier pin | Coral pin |
+|---|---|
+| A+ | DAC_OUT / A2 |
+| A− | GND |
+| SD | Not connected |
+| VIN | VSYS |
+| GND | GND |
 
 Build the image:
 
@@ -58,9 +68,9 @@ python ../coralmicro/scripts/flashtool.py \
 2. Point the camera at an object and press the button.
    - The green light will turn off.
    - The camera will take a picture and detect an object.
-3. The model now generates tokens starting with a prompt based on the object.
-   - The results are streamed to the serial port.
-   - This happens at a rate of ~2.5 tokens per second.
-4. Generation stops after the end token or maximum steps.
+3. The model now generates a story starting with a prompt based on the object.
+   - Sentences are spoken using text to speech while the story is being generated.
+   - The story is also streamed to the serial port.
+4. Generation stops after the end token or maximum steps, and playback finishes.
    - The green light will turn on again.
    - Goto 2.

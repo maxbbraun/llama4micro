@@ -27,7 +27,7 @@
 /* Entry Point */
 ENTRY(Reset_Handler)
 
-HEAP_SIZE  = DEFINED(__heap_size__)  ? __heap_size__  : 0x03F09800;
+HEAP_SIZE  = DEFINED(__heap_size__)  ? __heap_size__  : 0x02000000;
 STACK_SIZE = DEFINED(__stack_size__) ? __stack_size__ : 0x0400;
 RPMSG_SHMEM_SIZE = DEFINED(__use_shmem__) ? 0x2000 : 0;
 NCACHE_SIZE = 0x8000;
@@ -236,6 +236,13 @@ SECTIONS
     . = ALIGN(4);
   } > m_sdram
 
+  /* Speech pronunciation tables and inference code use SDRAM. */
+  .speech_data :
+  {
+    *nano_lex_*.obj(.rodata* .text*)
+    *snt_nano.c.obj(.rodata* .text*)
+  } > m_sdram
+
   /* The program code and other data goes into internal RAM */
   .text :
   {
@@ -408,8 +415,8 @@ SECTIONS
     __START_BSS = .;
     __bss_start__ = .;
     *(m_usb_dma_noninit_data)
-    *(.bss)
-    *(.bss*)
+    *(EXCLUDE_FILE(*nano_lex_g2p.c.obj) .bss)
+    *(EXCLUDE_FILE(*nano_lex_g2p.c.obj) .bss*)
     *(COMMON)
     . = ALIGN(4);
     __bss_end__ = .;
@@ -424,6 +431,7 @@ SECTIONS
     . = ALIGN(4);
     __sdram_bss_start__ = .;
     *(.sdram_bss*)
+    *nano_lex_g2p.c.obj(.bss .bss*)
     /* edgefast_bluetooth_bss */
     *lib_crypto_m7.a:*(.bss .bss*)
     *libedgefast_bluetooth_internal.a:*(.bss .bss*)

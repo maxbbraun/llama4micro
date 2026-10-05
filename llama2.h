@@ -830,7 +830,9 @@ int sample(Sampler* sampler, float* logits) {
 // generation loop
 
 void generate(Transformer *transformer, Tokenizer *tokenizer, Sampler *sampler, const char *prompt,
-              int steps, int GA, float* tokens_s) {
+              int steps, int GA, float* tokens_s,
+              void (*token_callback)(const char*, void*) = nullptr,
+              void* callback_context = nullptr) {
     const char *empty_prompt = "";
     if (prompt == NULL) { prompt = empty_prompt; }
 
@@ -869,6 +871,8 @@ void generate(Transformer *transformer, Tokenizer *tokenizer, Sampler *sampler, 
         // print the token as string, decode it with the Tokenizer object
         char* piece = decode(tokenizer, token, next);
         safe_printf(piece); // same as printf("%s", piece), but skips "unsafe" bytes
+        // Consume or copy synchronously; piece belongs to the tokenizer.
+        if (token_callback) { token_callback(piece, callback_context); }
         fflush(stdout);
         token = next;
 

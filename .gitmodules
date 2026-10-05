@@ -7,3 +7,6 @@
 [submodule "ultralytics"]
 	path = ultralytics
 	url = https://github.com/ultralytics/ultralytics.git
+[submodule "sanoTTS"]
+	path = sanoTTS
+	url = https://github.com/Ampixa/sanoTTS.git

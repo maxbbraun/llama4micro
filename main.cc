@@ -1,3 +1,4 @@
+#include <cstdio>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -10,13 +11,13 @@
 #include "libs/tensorflow/utils.h"
 #include "libs/tpu/edgetpu_manager.h"
 #include "libs/tpu/edgetpu_op.h"
+#include "llama2.h"
+#include "speech/speech.h"
 #include "third_party/freertos_kernel/include/FreeRTOS.h"
 #include "third_party/freertos_kernel/include/task.h"
 #include "third_party/tflite-micro/tensorflow/lite/micro/micro_error_reporter.h"
 #include "third_party/tflite-micro/tensorflow/lite/micro/micro_interpreter.h"
 #include "third_party/tflite-micro/tensorflow/lite/micro/micro_mutable_op_resolver.h"
-
-#include "llama2.h"
 #include "yolov8.h"
 
 using namespace coralmicro;
@@ -51,6 +52,10 @@ std::vector<std::string>* vision_labels;
 const size_t kTensorArenaSize = 320 * 1024;
 STATIC_TENSOR_ARENA_IN_SDRAM(tensor_arena, kTensorArenaSize);
 PerformanceMode kTpuPerformanceMode = PerformanceMode::kLow;  // Fast enough.
+
+// Speech model data paths.
+const char* kSpeechFrontModelPath = "/models/sanotts/front_q8.bin";
+const char* kSpeechDecoderModelPath = "/models/sanotts/model_q8.bin";
 
 // Camera and object detection configuration.
 CameraFrameFormat frame_format;
@@ -137,6 +142,17 @@ void UnloadVisionModel() {
 
   delete vision_model_buffer;
   delete vision_labels;
+}
+
+// Loads the speech model weights into memory.
+bool LoadSpeechModel() {
+  int64_t timer_start = TimerMillis();
+  if (!speech::LoadModel(kSpeechFrontModelPath, kSpeechDecoderModelPath)) {
+    return false;
+  }
+  float timer_s = (TimerMillis() - timer_start) / 1000.0f;
+  printf(">>> Speech model loading took %.2f s\n", timer_s);
+  return true;
 }
 
 // Takes a picture and returns the label of the main detected object.
@@ -227,19 +243,29 @@ void TellStory(std::string prompt) {
   printf(">>> Generating tokens...\n");
 
   float tokens_s;
+  speech::BeginAsync();
   generate(&transformer, &tokenizer, &sampler, prompt.c_str(), steps,
-           group_size, &tokens_s);
+           group_size, &tokens_s, speech::Append, nullptr);
+  if (!speech::Flush()) {
+    printf("ERROR: Failed to play story\n");
+  }
 
   printf(">>> Averaged %.2f tokens/s\n", tokens_s);
 }
 
 extern "C" [[noreturn]] void app_main(void* param) {
   (void)param;
+  setvbuf(stdout, nullptr, _IONBF, 0);
 
   // Set up the button interrupt.
+  const TaskHandle_t app_task = xTaskGetCurrentTaskHandle();
   GpioConfigureInterrupt(
       Gpio::kUserButton, GpioInterruptMode::kIntModeFalling,
-      [handle = xTaskGetCurrentTaskHandle()]() { xTaskResumeFromISR(handle); },
+      [app_task]() {
+        BaseType_t woken = pdFALSE;
+        vTaskNotifyGiveFromISR(app_task, &woken);
+        portYIELD_FROM_ISR(woken);
+      },
       kButtonDebounceUs);
 
   // Load the models while showing the status LED.
@@ -247,12 +273,17 @@ extern "C" [[noreturn]] void app_main(void* param) {
   LedSet(Led::kUser, false);
   LoadLlamaModel();
   LoadVisionModel();
+  if (!LoadSpeechModel()) {
+    // Keep the status LED on until the model files are installed and we reset.
+    while (true) vTaskDelay(pdMS_TO_TICKS(1000));
+  }
 
   while (true) {
-    // Wait for a button press while showing the user LED.
+    // Ignore presses during the previous story, then wait for a new one.
+    ulTaskNotifyTake(pdTRUE, 0);
     LedSet(Led::kStatus, false);
     LedSet(Led::kUser, true);
-    vTaskSuspend(nullptr);
+    ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
     // Continuing here after the button interrupt.
 
     // Take a picture while (automatically) showing the camera LED. The result
