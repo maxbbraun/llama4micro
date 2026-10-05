@@ -7,3 +7,6 @@
 [submodule "yolov5"]
 	path = yolov5
 	url = git@github.com:ultralytics/yolov5.git
+[submodule "sanoTTS"]
+	path = sanoTTS
+	url = https://github.com/Ampixa/sanoTTS.git

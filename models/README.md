@@ -65,3 +65,13 @@ The labels are from the [COCO dataset](https://cocodataset.org/). Convert them t
 ```bash
 python models/export_coco_labels.py
 ```
+
+### Speech
+
+Speech uses the int8 [heartnano](https://huggingface.co/ampixa/sanoTTS/tree/main/heartnano) voice from [sanoTTS](https://github.com/Ampixa/sanoTTS), running on the Arm Cortex-M7 CPU at a 24 kHz sample rate. The two weight files are copied from the pinned submodule.
+
+```bash
+mkdir -p models/sanotts
+cp sanoTTS/web/voices/heartnano/front_q8.bin models/sanotts/
+cp sanoTTS/web/voices/heartnano/model_q8.bin models/sanotts/
+```
