@@ -35,7 +35,6 @@ typedef struct {
 typedef struct {
     // token embedding table
     QuantizedTensor *q_tokens; // (vocab_size, dim)
-    float* token_embedding_table; // same, but dequantized
 
     // weights for rmsnorms
     float* rms_att_weight; // (layer, dim) rmsnorm weights
@@ -136,6 +135,15 @@ void dequantize(QuantizedTensor *qx, float* x, int n, int gs) {
     }
 }
 
+// Quantization groups cover the flattened tensor, including across row boundaries.
+void dequantize_row(QuantizedTensor *qx, float* x, int row, int row_size, int gs) {
+    int offset = row * row_size;
+    for (int i = 0; i < row_size; ++i) {
+        int index = offset + i;
+        x[i] = qx->q[index] * qx->s[index / gs];
+    }
+}
+
 void quantize(QuantizedTensor *qx, float* x, int n, int gs) {
     int num_groups = n / gs;
     float Q_MAX = 127.0f;
@@ -194,9 +202,6 @@ void memory_map_weights(TransformerWeights *w, Config* p, void* ptr, uint8_t sha
     // now read all the quantized weights
     ptr = (void*)fptr; // now cast the pointer back to void*
     w->q_tokens = init_quantized_tensors(&ptr, 1, p->vocab_size * p->dim, gs);
-    // dequantize token embedding table
-    w->token_embedding_table = (float*)malloc(p->vocab_size * p->dim * sizeof(float));
-    dequantize(w->q_tokens, w->token_embedding_table, p->vocab_size * p->dim, gs);
 
     w->wq = init_quantized_tensors(&ptr, p->n_layers, p->dim * (p->n_heads * head_size), gs);
     w->wk = init_quantized_tensors(&ptr, p->n_layers, p->dim * (p->n_kv_heads * head_size), gs);
@@ -251,7 +256,6 @@ void build_transformer(Transformer *t, const char* checkpoint_path,
 void free_transformer(Transformer* t) {
     // free QuantizedTensors
     free(t->weights.q_tokens);
-    free(t->weights.token_embedding_table);
     free(t->weights.wq);
     free(t->weights.wk);
     free(t->weights.wv);
@@ -341,8 +345,8 @@ float* forward(Transformer* transformer, int token, int pos, int gs) {
     int hidden_dim =  p->hidden_dim;
     int head_size = dim / p->n_heads;
 
-    // copy the token embedding into x
-    memcpy(x, w->token_embedding_table + token*dim, dim * sizeof(float));
+    // Expand only this token's row, avoiding the full FP32 embedding cache.
+    dequantize_row(w->q_tokens, x, token, dim, gs);
 
     // forward all the layers
     for(int l = 0; l < p->n_layers; l++) {
