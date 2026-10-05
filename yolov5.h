@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <string>
 #include <vector>
 
@@ -98,32 +99,34 @@ std::vector<Object> GetDetectionResults(tflite::MicroInterpreter* interpreter,
   auto output_tensor = interpreter->output_tensor(0);
   const int num_rows = output_tensor->dims->data[1];
   int row_dims = output_tensor->dims->data[2];
-  int header_size = 5;  // x, y, width, height, confidence
+  int header_size = 5;  // center x, center y, width, height, objectness
   uint8_t* data = output_tensor->data.uint8;
   TfLiteQuantizationParams quantization_params = output_tensor->params;
 
   // Rows come in groups of header_size + num_labels.
   std::vector<Object> raw_results;
   for (int row = 0; row < num_rows; ++row) {
-    // The first number is the confidence.
-    float confidence = Dequantize(data[row * row_dims], quantization_params);
+    // YOLOv5 exports [center_x, center_y, width, height, objectness, classes...].
+    float confidence = Dequantize(data[row * row_dims + 4], quantization_params);
 
-    // Discard low confidence rows.
+    // Discard low objectness rows, independently of the class threshold below.
     if (confidence < label_confidence_threshold) {
       continue;
     }
 
-    // The next four numbers are the bounding box.
-    float x = Dequantize(data[row * row_dims + 1], quantization_params);
-    float y = Dequantize(data[row * row_dims + 2], quantization_params);
-    float width = Dequantize(data[row * row_dims + 3], quantization_params);
-    float height = Dequantize(data[row * row_dims + 4], quantization_params);
+    float center_x = Dequantize(data[row * row_dims], quantization_params);
+    float center_y = Dequantize(data[row * row_dims + 1], quantization_params);
+    float width = Dequantize(data[row * row_dims + 2], quantization_params);
+    float height = Dequantize(data[row * row_dims + 3], quantization_params);
 
-    // Clip the bounding box to the image.
-    x = std::max(0.0f, std::min(x, 1.0f));
-    y = std::max(0.0f, std::min(y, 1.0f));
-    width = std::max(0.0f, std::min(width, 1.0f - x));
-    height = std::max(0.0f, std::min(height, 1.0f - y));
+    // Convert center-based xywh to clipped top-left xywh. Clip both corners
+    // before subtracting so boxes crossing the left/top edges shrink correctly.
+    float x = std::max(0.0f, std::min(center_x - width / 2, 1.0f));
+    float y = std::max(0.0f, std::min(center_y - height / 2, 1.0f));
+    float right = std::max(0.0f, std::min(center_x + width / 2, 1.0f));
+    float bottom = std::max(0.0f, std::min(center_y + height / 2, 1.0f));
+    width = std::max(0.0f, right - x);
+    height = std::max(0.0f, bottom - y);
 
     // The remaining numbers are the label scores. Pick the highest one.
     float max_score = 0.0f;
