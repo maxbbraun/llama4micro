@@ -275,7 +275,7 @@ extern "C" [[noreturn]] void app_main(void* param) {
   LoadLlamaModel();
   LoadVisionModel();
   if (!LoadSpeechModel()) {
-    // Keep the status LED on until the model files are installed and we reset.
+    // Keep the status LED on; reset to retry speech initialization.
     while (true) vTaskDelay(pdMS_TO_TICKS(1000));
   }
 

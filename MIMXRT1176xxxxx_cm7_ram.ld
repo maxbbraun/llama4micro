@@ -27,7 +27,13 @@
 /* Entry Point */
 ENTRY(Reset_Handler)
 
-HEAP_SIZE  = DEFINED(__heap_size__)  ? __heap_size__  : 0x02000000;
+SDRAM_SIZE_BYTES = 64M;
+
+/* Code, tables, tensor arena, camera buffers and BSS use ~4.1 MiB. */
+SDRAM_STATIC_RESERVE_BYTES = 5M;
+HEAP_SIZE  = DEFINED(__heap_size__) ? __heap_size__ : SDRAM_SIZE_BYTES - SDRAM_STATIC_RESERVE_BYTES;
+ASSERT(HEAP_SIZE > 0 && HEAP_SIZE < SDRAM_SIZE_BYTES, "Invalid SDRAM heap size")
+ASSERT((HEAP_SIZE & 7) == 0, "SDRAM heap size must be 8-byte aligned")
 STACK_SIZE = DEFINED(__stack_size__) ? __stack_size__ : 0x0400;
 RPMSG_SHMEM_SIZE = DEFINED(__use_shmem__) ? 0x2000 : 0;
 NCACHE_SIZE = 0x8000;
@@ -51,7 +57,7 @@ MEMORY
   m_ocram               (RX)  : ORIGIN = 0x20240000 + TEXT_SIZE, LENGTH = 0x00080000 - TEXT_SIZE
   rpmsg_sh_mem          (RW)  : ORIGIN = 0x202C0000, LENGTH = RPMSG_SHMEM_SIZE
   m_heap                (RW)  : ORIGIN = 0x80000000, LENGTH = HEAP_SIZE
-  m_sdram               (RX)  : ORIGIN = 0x80000000 + HEAP_SIZE, LENGTH = 0x04000000 - HEAP_SIZE
+  m_sdram               (RX)  : ORIGIN = 0x80000000 + HEAP_SIZE, LENGTH = SDRAM_SIZE_BYTES - HEAP_SIZE
 }
 
 /* Define output sections */

@@ -36,7 +36,7 @@ constexpr size_t kChunkBytes = 120;
 constexpr size_t kMaxChunkBytes = 480;
 constexpr UBaseType_t kQueueDepth = 2;
 
-// The recursive fallback retains a phoneme array at each depth.
+// Recursive chunk splitting retains a phoneme array at each depth.
 constexpr size_t kWorkerStackWords = 4096;
 constexpr UBaseType_t kWorkerPriority = coralmicro::kAppTaskPriority;
 static_assert(kWorkerPriority > tskIDLE_PRIORITY,
@@ -55,8 +55,6 @@ SemaphoreHandle_t completion = nullptr;
 TaskHandle_t worker_task = nullptr;
 TaskHandle_t producer_task = nullptr;
 UBaseType_t producer_priority = 0;
-bool async_active = false;  // Producer task only.
-bool producer_ok = true;    // Producer task only.
 
 // Published by the worker before giving the completion semaphore.
 volatile bool completed_ok = true;
@@ -173,11 +171,13 @@ void Worker(void*) {
   WorkItem item;
   bool batch_ok = true;
   while (true) {
-    if (xQueueReceive(work_queue, &item, portMAX_DELAY) != pdPASS) continue;
+    const BaseType_t received = xQueueReceive(work_queue, &item, portMAX_DELAY);
+    configASSERT(received == pdPASS);
     if (item.barrier) {
       completed_ok = batch_ok;
       batch_ok = true;
-      xSemaphoreGive(completion);
+      const BaseType_t completed = xSemaphoreGive(completion);
+      configASSERT(completed == pdTRUE);
     } else {
       const bool ok = SayChunk(item.text, 0);
       batch_ok = ok && batch_ok;
@@ -185,8 +185,7 @@ void Worker(void*) {
   }
 }
 
-bool EnsureWorker() {
-  if (worker_task) return true;
+bool CreateWorker() {
   work_queue = xQueueCreateStatic(kQueueDepth, sizeof(WorkItem), queue_items,
                                   &queue_storage);
   completion = xSemaphoreCreateBinaryStatic(&completion_storage);
@@ -199,28 +198,18 @@ bool EnsureWorker() {
   work_queue = nullptr;
   completion = nullptr;
   worker_task = nullptr;
-  printf(
-      "ERROR: Could not create speech worker; using synchronous playback.\n");
+  printf("ERROR: Could not create speech worker.\n");
   return false;
 }
 
 void QueueWork(const WorkItem& item) {
   // Bounded backpressure: wait for a slot instead of dropping generated text.
-  // With a live queue and portMAX_DELAY this retries only an unexpected RTOS
-  // failure, retaining the exact item until it has been accepted.
-  while (xQueueSend(work_queue, &item, portMAX_DELAY) != pdPASS) {
-    printf("ERROR: Could not queue speech; retrying.\n");
-    vTaskDelay(1);
-  }
+  const BaseType_t sent = xQueueSend(work_queue, &item, portMAX_DELAY);
+  configASSERT(sent == pdPASS);
 }
 
 void SubmitChunk(const std::string& text) {
   if (text.empty()) return;
-  if (!async_active) {
-    const bool ok = SayChunk(text, 0);
-    producer_ok = ok && producer_ok;
-    return;
-  }
 
   // Append bounds each chunk before it gets here; copy into the queue, never
   // retain the tokenizer's temporary piece or a pointer into pending.
@@ -243,7 +232,7 @@ namespace speech {
 
 bool LoadModel(const char* front_path, const char* decoder_path) {
   if (worker_task) {
-    printf("ERROR: Cannot reload the speech model after starting playback.\n");
+    printf("ERROR: Cannot reload the speech model after initialization.\n");
     return false;
   }
   speech_front = nullptr;
@@ -257,31 +246,32 @@ bool LoadModel(const char* front_path, const char* decoder_path) {
   }
   speech_front = front;
   speech_decoder = decoder;
-  return true;
+  return CreateWorker();
 }
 
-bool BeginAsync() {
-  if (async_active) return true;
-  if (!pending.empty()) Flush();
-  producer_ok = true;
-  if (!EnsureWorker()) return false;
+void BeginAsync() {
+  configASSERT(worker_task && !producer_task && pending.empty());
   producer_task = xTaskGetCurrentTaskHandle();
   producer_priority = uxTaskPriorityGet(producer_task);
-  async_active = true;
 
   // Time slicing is disabled in this SDK. Keep USB/PMIC above the worker, and
   // let LLM computation use the CPU whenever playback puts the worker to sleep.
   vTaskPrioritySet(producer_task, kWorkerPriority - 1);
-  return true;
 }
 
 void Append(const char* piece, void*) {
+  configASSERT(producer_task == xTaskGetCurrentTaskHandle());
   if (!piece) return;
 
   // Decode may return multiple characters in one token. Preserve all of them.
   for (const char* p = piece; *p; ++p) {
+    // Wait for the next character, even across callbacks, to distinguish a
+    // sentence-ending period from a decimal point (including leading .5).
+    if (!pending.empty() && pending.back() == '.' && (*p < '0' || *p > '9')) {
+      SubmitPending();
+    }
     pending += *p;
-    if (*p == '.' || *p == '!' || *p == '?' || *p == '\n') {
+    if (*p == '!' || *p == '?' || *p == '\n') {
       SubmitPending();
     } else if (pending.size() >= kChunkBytes) {
       const size_t split = pending.rfind(' ');
@@ -298,20 +288,16 @@ void Append(const char* piece, void*) {
 }
 
 bool Flush() {
+  configASSERT(producer_task == xTaskGetCurrentTaskHandle());
   SubmitPending();
-  bool ok = producer_ok;
-  if (async_active) {
-    WorkItem barrier{};
-    barrier.barrier = true;
-    QueueWork(barrier);
-    while (xSemaphoreTake(completion, portMAX_DELAY) != pdTRUE) {
-    }
-    ok = completed_ok && ok;
-    async_active = false;
-    vTaskPrioritySet(producer_task, producer_priority);
-    producer_task = nullptr;
-  }
-  producer_ok = true;
+  WorkItem barrier{};
+  barrier.barrier = true;
+  QueueWork(barrier);
+  const BaseType_t completed = xSemaphoreTake(completion, portMAX_DELAY);
+  configASSERT(completed == pdTRUE);
+  const bool ok = completed_ok;
+  vTaskPrioritySet(producer_task, producer_priority);
+  producer_task = nullptr;
   return ok;
 }
 
