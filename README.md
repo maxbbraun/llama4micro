@@ -6,7 +6,10 @@ A "large" language model running on a microcontroller.
 
 ## Background
 
-I was wondering if it's possible to fit a non-trivial language model on a microcontroller. Turns out the answer is some version of yes! (Later, things got a bit out of hand and now the prompt is based on objects detected by the camera, and a text-to-speech model [reads the story out loud](llama4micro.mp3).)
+I was wondering if it's possible to fit a non-trivial language model on a microcontroller. Turns out the answer is some version of yes!
+
+> [!WARNING]
+> Later, things got a bit out of hand and now the prompt is based on objects detected by the camera, and a text-to-speech model [reads the story out loud](llama4micro.mp3).
 
 This project is using the [Coral Dev Board Micro](https://coral.ai/products/dev-board-micro) with its [FreeRTOS toolchain](https://coral.ai/docs/dev-board-micro/freertos/). The board has a number of neat [hardware features](https://coral.ai/docs/dev-board-micro/get-started/#the-hardware), but – most importantly for our purposes – it has 64MB of RAM. That's tiny for LLMs, which are typically measured in the GBs, but comparatively huge for a microcontroller.
 
