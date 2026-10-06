@@ -1,4 +1,7 @@
+#pragma once
+
 #include <algorithm>
+#include <cmath>
 #include <string>
 #include <vector>
 
@@ -89,78 +92,68 @@ inline float Dequantize(uint8_t quantized_value,
          quantization_params.scale;
 }
 
-// Processes the output tensor and returns a list of detected objects.
+// Decodes one box edge from its 16-bin distribution, in grid-cell units.
+float DecodeDistance(const uint8_t* logits,
+                     const TfLiteQuantizationParams& quantization_params) {
+  const uint8_t maximum = *std::max_element(logits, logits + 16);
+  float total = 0.0f;
+  float weighted_total = 0.0f;
+  for (int bin = 0; bin < 16; ++bin) {
+    float probability = std::exp((static_cast<int>(logits[bin]) - maximum) *
+                                 quantization_params.scale);
+    total += probability;
+    weighted_total += bin * probability;
+  }
+  return weighted_total / total;
+}
+
+// Decodes the six raw YOLOv8 detection heads and returns detected objects.
 std::vector<Object> GetDetectionResults(tflite::MicroInterpreter* interpreter,
-                                        float label_confidence_threshold,
-                                        float class_score_threshold,
+                                        float confidence_threshold,
                                         float min_bbox_size,
                                         std::vector<std::string>* labels) {
-  // Extract the data from the output tensor.
-  auto output_tensor = interpreter->output_tensor(0);
-  const int num_rows = output_tensor->dims->data[1];
-  int row_dims = output_tensor->dims->data[2];
-  int header_size = 5;  // center x, center y, width, height, objectness
-  uint8_t* data = output_tensor->data.uint8;
-  TfLiteQuantizationParams quantization_params = output_tensor->params;
-
-  // Rows come in groups of header_size + num_labels.
+  // Output indices pair box distributions with class scores at each scale.
+  const int box_outputs[] = {4, 5, 0};
+  const int class_outputs[] = {1, 3, 2};
   std::vector<Object> raw_results;
-  for (int row = 0; row < num_rows; ++row) {
-    // YOLOv5 exports [center_x, center_y, width, height, objectness, classes...].
-    float objectness = Dequantize(data[row * row_dims + 4], quantization_params);
-
-    // Discard low objectness rows, independently of the class threshold below.
-    if (objectness < label_confidence_threshold) {
-      continue;
-    }
-
-    float center_x = Dequantize(data[row * row_dims], quantization_params);
-    float center_y = Dequantize(data[row * row_dims + 1], quantization_params);
-    float width = Dequantize(data[row * row_dims + 2], quantization_params);
-    float height = Dequantize(data[row * row_dims + 3], quantization_params);
-
-    // Convert center-based xywh to clipped top-left xywh. Clip both corners
-    // before subtracting so boxes crossing the left/top edges shrink correctly.
-    float x = std::max(0.0f, std::min(center_x - width / 2, 1.0f));
-    float y = std::max(0.0f, std::min(center_y - height / 2, 1.0f));
-    float right = std::max(0.0f, std::min(center_x + width / 2, 1.0f));
-    float bottom = std::max(0.0f, std::min(center_y + height / 2, 1.0f));
-    width = std::max(0.0f, right - x);
-    height = std::max(0.0f, bottom - y);
-
-    // The remaining numbers are the label scores. Pick the highest one.
-    float max_score = 0.0f;
-    int max_score_label = 0;
-    int num_labels = row_dims - header_size;
-    for (int label = 0; label < num_labels; ++label) {
-      float score = Dequantize(data[row * row_dims + header_size + label],
-                               quantization_params);
-      if (score > max_score) {
-        max_score = score;
-        max_score_label = label;
+  for (int scale = 0; scale < 3; ++scale) {
+    auto* boxes = interpreter->output_tensor(box_outputs[scale]);
+    auto* classes = interpreter->output_tensor(class_outputs[scale]);
+    const int grid_size = classes->dims->data[1];
+    const int num_labels = classes->dims->data[3];
+    for (int row = 0; row < grid_size * grid_size; ++row) {
+      // Class probabilities already include sigmoid; there is no objectness.
+      const uint8_t* scores = classes->data.uint8 + row * num_labels;
+      const int label = std::max_element(scores, scores + num_labels) - scores;
+      float confidence = Dequantize(scores[label], classes->params);
+      if (confidence < confidence_threshold) {
+        continue;
       }
-    }
 
-    // Discard low score classes.
-    if (max_score < class_score_threshold) {
-      continue;
-    }
+      // Each grid point predicts left, top, right, and bottom distances.
+      float distance[4];
+      for (int edge = 0; edge < 4; ++edge) {
+        distance[edge] = DecodeDistance(
+            boxes->data.uint8 + row * 64 + edge * 16, boxes->params);
+      }
+      float center_x = row % grid_size + 0.5f;
+      float center_y = row / grid_size + 0.5f;
+      float x = std::clamp((center_x - distance[0]) / grid_size, 0.0f, 1.0f);
+      float y = std::clamp((center_y - distance[1]) / grid_size, 0.0f, 1.0f);
+      float right =
+          std::clamp((center_x + distance[2]) / grid_size, 0.0f, 1.0f);
+      float bottom =
+          std::clamp((center_y + distance[3]) / grid_size, 0.0f, 1.0f);
+      float width = right - x;
+      float height = bottom - y;
 
-    // Discard small bounding boxes. Both sides have to be large enough.
-    if (width < min_bbox_size || height < min_bbox_size) {
-      continue;
+      // Discard small bounding boxes. Both sides have to be large enough.
+      if (width < min_bbox_size || height < min_bbox_size) {
+        continue;
+      }
+      raw_results.push_back(
+          {labels->at(label), confidence, x, y, width, height});
     }
-
-    // Assemble the result.
-    Object object;
-    object.label = labels->at(max_score_label);
-    // Combine objectness and class score for suppression and reporting.
-    object.confidence = objectness * max_score;
-    object.x = x;
-    object.y = y;
-    object.width = width;
-    object.height = height;
-    raw_results.push_back(object);
   }
 
   // Perform naive non-maximum suppression.

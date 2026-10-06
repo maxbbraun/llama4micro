@@ -13,11 +13,11 @@ This project is using the [Coral Dev Board Micro](https://coral.ai/products/dev-
 The LLM implementation itself is an adaptation of [llama2.c](https://github.com/karpathy/llama2.c) and the [tinyllamas](https://huggingface.co/karpathy/tinyllamas/tree/main) checkpoints trained on the [TinyStories](https://huggingface.co/datasets/roneneldan/TinyStories) dataset. The quality of the smaller model versions isn't ideal, but good enough to generate somewhat coherent (and occasionally weird) stories.
 
 > [!NOTE]
-> Language model inference runs on the 800 MHz [Arm Cortex-M7](https://developer.arm.com/Processors/Cortex-M7) CPU core. Camera image classification uses the [Edge TPU](https://coral.ai/technology/) and a [compiled](https://coral.ai/docs/edgetpu/compiler/) [YOLOv5 model](https://github.com/ultralytics/yolov5). The board also has a second 400 MHz [Arm Cortex-M4](https://developer.arm.com/Processors/Cortex-M4) CPU core, which is currently unused.
+> Language model inference runs on the 800 MHz [Arm Cortex-M7](https://developer.arm.com/Processors/Cortex-M7) CPU core. Camera image classification uses the [Edge TPU](https://coral.ai/technology/) and a [compiled](https://coral.ai/docs/edgetpu/compiler/) [YOLOv8 model](https://github.com/ultralytics/ultralytics). The board also has a second 400 MHz [Arm Cortex-M4](https://developer.arm.com/Processors/Cortex-M4) CPU core, which is currently unused.
 
 ## Setup
 
-Clone this repo with its submodules [`karpathy/llama2.c`](https://github.com/karpathy/llama2.c), [`google-coral/coralmicro`](https://github.com/google-coral/coralmicro), and [`ultralytics/yolov5`](https://github.com/ultralytics/yolov5).
+Clone this repo with its submodules [`karpathy/llama2.c`](https://github.com/karpathy/llama2.c) and [`google-coral/coralmicro`](https://github.com/google-coral/coralmicro).
 
 ```bash
 git clone --recurse-submodules https://github.com/maxbbraun/llama4micro.git

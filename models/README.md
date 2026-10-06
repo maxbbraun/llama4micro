@@ -9,7 +9,6 @@ python3 -m venv venv
 . venv/bin/activate
 
 pip install -r llama2.c/requirements.txt
-pip install -r yolov5/requirements.txt
 
 ```
 
@@ -39,29 +38,35 @@ cp llama2.c/tokenizer.bin models/${LLAMA_MODEL_DIR}/
 
 ### Vision
 
-Object detection (with labels used for prompting Llama) is based on [YOLOv5](https://github.com/ultralytics/yolov5), specifially the smallest version "n" at a 224x224 resolution. This model runs on the [Coral Edge TPU](https://coral.ai/technology/), which requires an additional compilation step (handled by the exporter).
+Object detection (with labels used for prompting Llama) uses [YOLOv8n](https://github.com/ultralytics/ultralytics) at a 224x224 resolution with the 80 [COCO](https://cocodataset.org/) classes. The network runs on the [Coral Edge TPU](https://coral.ai/technology/); box decoding and non-maximum suppression run on the Arm Cortex-M7 CPU.
+
+Export the [pretrained weights](https://github.com/ultralytics/assets/releases/download/v8.3.0/yolov8n.pt) on x86-64 Linux with Python 3.12 and [Edge TPU Compiler](https://coral.ai/docs/edgetpu/compiler/) 14.1.317412892:
 
 ```bash
-git clone https://github.com/ultralytics/yolov5.git
+pip install torch==2.8.0 torchvision==0.23.0 \
+    --index-url https://download.pytorch.org/whl/cpu
+pip install ultralytics==8.3.228 numpy==1.26.4 opencv-python==4.11.0.86 \
+    onnx==1.20.1 onnxsim==0.6.3 onnxruntime==1.24.3 \
+    onnx2tf==1.26.3 tensorflow==2.19.1 tf_keras==2.19.0 \
+    onnx_graphsurgeon==0.6.1 sng4onnx==2.0.1 protobuf==4.25.5
 
-YOLO_RESOLUTION=224
-YOLO_VERSION=n
-VISION_MODEL_NAME=yolov5${YOLO_VERSION}-int8_edgetpu
-YOLO_MODEL_DIR=yolov5
+mkdir -p build/yolov8
+wget -O build/yolov8/yolov8n.pt \
+    https://github.com/ultralytics/assets/releases/download/v8.3.0/yolov8n.pt
+wget -O build/yolov8/coco128.zip \
+    https://github.com/ultralytics/assets/releases/download/v0.0.0/coco128.zip
+python -m zipfile -e build/yolov8/coco128.zip build/yolov8/calibration
 
-python yolov5/export.py \
-    --weights yolov5${YOLO_VERSION}.pt \
-    --include edgetpu \
-    --int8 \
-    --img ${YOLO_RESOLUTION} \
-    --data yolov5/data/coco128.yaml
-
-mkdir models/${YOLO_MODEL_DIR}/
-cp yolov5/${VISION_MODEL_NAME}.tflite models/${YOLO_MODEL_DIR}/
-```
-
-The labels are from the [COCO dataset](https://cocodataset.org/). Convert them to an easily readable format.
-
-```bash
-python models/export_coco_labels.py
+python models/export_yolov8.py
+cd build/yolov8
+TF_NUM_INTRAOP_THREADS=4 TF_NUM_INTEROP_THREADS=2 OMP_NUM_THREADS=4 \
+python -m onnx2tf \
+    -i yolov8n.onnx -o tflite -oiqt \
+    -cind images calibration.npy 0 1 \
+    -iqd uint8 -oqd uint8 -v warn
+mkdir -p edgetpu
+edgetpu_compiler --show_operations --out_dir edgetpu \
+    tflite/yolov8n_full_integer_quant.tflite
+cd ../..
+python -c 'from models.export_yolov8 import install_model; install_model()'
 ```

@@ -17,7 +17,7 @@
 #include "third_party/tflite-micro/tensorflow/lite/micro/micro_mutable_op_resolver.h"
 
 #include "llama2.h"
-#include "yolov5.h"
+#include "yolov8.h"
 
 using namespace coralmicro;
 using namespace tflite;
@@ -42,21 +42,20 @@ std::vector<uint8_t>* llama_tokenizer_buffer;
 Sampler sampler;
 
 // Vision model data path.
-const char* kVisionModelPath = "/models/yolov5/yolov5n-int8_edgetpu.tflite";
-const char* kVisionLabelsPath = "/models/yolov5/coco_labels.txt";
+const char* kVisionModelPath = "/models/yolov8/yolov8n-int8_edgetpu.tflite";
+const char* kVisionLabelsPath = "/models/yolov8/coco_labels.txt";
 
 // Vision model data structures.
 std::vector<uint8_t>* vision_model_buffer;
 std::vector<std::string>* vision_labels;
-const size_t kTensorArenaSize = 575 * 1024;
+const size_t kTensorArenaSize = 320 * 1024;
 STATIC_TENSOR_ARENA_IN_SDRAM(tensor_arena, kTensorArenaSize);
 PerformanceMode kTpuPerformanceMode = PerformanceMode::kLow;  // Fast enough.
 
 // Camera and object detection configuration.
 CameraFrameFormat frame_format;
 const int kDiscardFrames = 30;
-const float kLabelConfidenceThreshold = 0.4f;
-const float kBboxScoreThreshold = 0.2f;
+const float kConfidenceThreshold = 0.25f;
 const float kMinBboxSize = 0.1f;
 
 // Debounce interval for the button interrupt.
@@ -164,11 +163,8 @@ std::string TakePicture() {
   }
 
   // Initialize the TF Lite interpreter.
-  MicroMutableOpResolver<4> tf_resolver;
+  MicroMutableOpResolver<1> tf_resolver;
   tf_resolver.AddCustom(kCustomOp, RegisterCustomOp());
-  tf_resolver.AddQuantize();
-  tf_resolver.AddConcatenation();
-  tf_resolver.AddReshape();
   MicroErrorReporter tf_error_reporter;
   MicroInterpreter tf_interpreter(GetModel(vision_model_buffer->data()),
                                   tf_resolver, tensor_arena, kTensorArenaSize,
@@ -208,8 +204,7 @@ std::string TakePicture() {
 
   // Process the results.
   auto results = yolo::GetDetectionResults(
-      &tf_interpreter, kLabelConfidenceThreshold, kBboxScoreThreshold,
-      kMinBboxSize, vision_labels);
+      &tf_interpreter, kConfidenceThreshold, kMinBboxSize, vision_labels);
   if (results.empty()) {
     printf(">>> Found no objects\n");
     return "";
