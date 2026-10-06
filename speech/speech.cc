@@ -29,10 +29,11 @@ extern "C" int64_t snt_now_us() { return coralmicro::TimerMicros(); }
 namespace {
 
 constexpr size_t kArenaBytes = 1024 * 1024;
-constexpr uint32_t kRate = audio_playback::kSampleRate;
-constexpr size_t kMaxSamples = 24 * kRate;
-constexpr size_t kChunkChars = 120;
-constexpr size_t kMaxChunkChars = 480;
+constexpr uint32_t kSampleRateHz = audio_playback::kSampleRateHz;
+constexpr size_t kMaxAudioDurationSeconds = 24;
+constexpr size_t kMaxSamples = kMaxAudioDurationSeconds * kSampleRateHz;
+constexpr size_t kChunkBytes = 120;
+constexpr size_t kMaxChunkBytes = 480;
 constexpr UBaseType_t kQueueDepth = 2;
 
 // The recursive fallback retains a phoneme array at each depth.
@@ -43,7 +44,7 @@ static_assert(kWorkerPriority > tskIDLE_PRIORITY,
 
 struct WorkItem {
   bool barrier;
-  char text[kMaxChunkChars + 1];
+  char text[kMaxChunkBytes + 1];
 };
 
 StaticQueue_t queue_storage;
@@ -223,7 +224,7 @@ void SubmitChunk(const std::string& text) {
 
   // Append bounds each chunk before it gets here; copy into the queue, never
   // retain the tokenizer's temporary piece or a pointer into pending.
-  configASSERT(text.size() <= kMaxChunkChars);
+  configASSERT(text.size() <= kMaxChunkBytes);
   WorkItem item{};
   std::memcpy(item.text, text.data(), text.size());
   QueueWork(item);
@@ -282,12 +283,12 @@ void Append(const char* piece, void*) {
     pending += *p;
     if (*p == '.' || *p == '!' || *p == '?' || *p == '\n') {
       SubmitPending();
-    } else if (pending.size() >= kChunkChars) {
+    } else if (pending.size() >= kChunkBytes) {
       const size_t split = pending.rfind(' ');
       if (split != std::string::npos && split > 0) {
         SubmitChunk(pending.substr(0, split));
         pending.erase(0, split + 1);
-      } else if (pending.size() >= kMaxChunkChars) {
+      } else if (pending.size() >= kMaxChunkBytes) {
         // Bound pathological unbroken output. SayChunk reports unsupported
         // text.
         SubmitPending();

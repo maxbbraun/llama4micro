@@ -49,8 +49,8 @@ const char* kVisionLabelsPath = "/models/yolov8/coco_labels.txt";
 // Vision model data structures.
 std::vector<uint8_t>* vision_model_buffer;
 std::vector<std::string>* vision_labels;
-const size_t kTensorArenaSize = 320 * 1024;
-STATIC_TENSOR_ARENA_IN_SDRAM(tensor_arena, kTensorArenaSize);
+const size_t kTensorArenaBytes = 320 * 1024;
+STATIC_TENSOR_ARENA_IN_SDRAM(tensor_arena, kTensorArenaBytes);
 PerformanceMode kTpuPerformanceMode = PerformanceMode::kLow;  // Fast enough.
 
 // Speech model data paths.
@@ -183,7 +183,7 @@ std::string TakePicture() {
   tf_resolver.AddCustom(kCustomOp, RegisterCustomOp());
   MicroErrorReporter tf_error_reporter;
   MicroInterpreter tf_interpreter(GetModel(vision_model_buffer->data()),
-                                  tf_resolver, tensor_arena, kTensorArenaSize,
+                                  tf_resolver, tensor_arena, kTensorArenaBytes,
                                   &tf_error_reporter);
   if (tf_interpreter.AllocateTensors() != kTfLiteOk) {
     printf("ERROR: Failed to allocate tensors\n");

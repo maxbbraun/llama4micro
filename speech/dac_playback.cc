@@ -48,23 +48,25 @@ void Init() {
 }
 
 bool PlayCodes(const uint16_t* codes, size_t count) {
-  constexpr uint32_t kRate = audio_playback::kSampleRate;
+  constexpr uint32_t kSampleRateHz = audio_playback::kSampleRateHz;
+  constexpr uint64_t kPlaybackTimeoutMarginUs = 2000000;
   if (!codes || !count || !g_done) return false;
   Init();
   const uint32_t bus_hz = CLOCK_GetRootClockFreq(kCLOCK_Root_Bus);
-  if (!bus_hz || bus_hz % kRate != 0) return false;
+  if (!bus_hz || bus_hz % kSampleRateHz != 0) return false;
   PIT_StopTimer(PIT1, kPIT_Chnl_0);
   PIT_DisableInterrupts(PIT1, kPIT_Chnl_0, kPIT_TimerInterruptEnable);
   PIT_ClearStatusFlags(PIT1, kPIT_Chnl_0, kPIT_TimerFlag);
   NVIC_ClearPendingIRQ(PIT1_IRQn);
-  PIT_SetTimerPeriod(PIT1, kPIT_Chnl_0, bus_hz / kRate);
+  PIT_SetTimerPeriod(PIT1, kPIT_Chnl_0, bus_hz / kSampleRateHz);
   g_next = codes;
   g_remaining = count;
   g_done = false;
   __DMB();
   const uint64_t started = coralmicro::TimerMicros();
   const uint64_t timeout_us =
-      static_cast<uint64_t>(count) * 1000000 / kRate + 2000000;
+      static_cast<uint64_t>(count) * 1000000 / kSampleRateHz +
+      kPlaybackTimeoutMarginUs;
   PIT_EnableInterrupts(PIT1, kPIT_Chnl_0, kPIT_TimerInterruptEnable);
   PIT_StartTimer(PIT1, kPIT_Chnl_0);
   while (!g_done && coralmicro::TimerMicros() - started < timeout_us) {
@@ -87,9 +89,12 @@ bool PlayCodes(const uint16_t* codes, size_t count) {
   return finished;
 }
 
-float Fade(size_t i, size_t count, uint32_t rate) {
+float Fade(size_t i, size_t count, uint32_t sample_rate_hz) {
+  constexpr uint32_t kFadeDurationMs = 5;
+  const size_t fade_samples =
+      static_cast<uint64_t>(sample_rate_hz) * kFadeDurationMs / 1000;
   const size_t ramp =
-      std::max<size_t>(1, std::min<size_t>(rate / 200, count / 2));
+      std::max<size_t>(1, std::min<size_t>(fade_samples, count / 2));
   const size_t edge = std::min(i, count - 1 - i);
   return static_cast<float>(std::min(edge, ramp)) / ramp;
 }
@@ -130,7 +135,8 @@ bool PlayPcm16(const int16_t* pcm, size_t samples) {
   // Keep the tested Q15 unity gain; volume is set on the amplifier.
   constexpr float kGain = 32767.0f / 32768.0f;
   for (size_t i = 0; i < samples; ++i) {
-    codes[i] = Code(pcm[i] / 32768.0f * kGain * Fade(i, samples, kSampleRate));
+    codes[i] =
+        Code(pcm[i] / 32768.0f * kGain * Fade(i, samples, kSampleRateHz));
   }
   const bool ok = PlayCodes(codes, samples);
   free(codes);
