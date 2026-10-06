@@ -20,7 +20,7 @@ The LLM implementation itself is an adaptation of [llama2.c](https://github.com/
 
 ## Setup
 
-Clone this repo with its submodules [`karpathy/llama2.c`](https://github.com/karpathy/llama2.c), [`google-coral/coralmicro`](https://github.com/google-coral/coralmicro), [`ultralytics/ultralytics`](https://github.com/ultralytics/ultralytics), [`maxbbraun/sanoTTS`](https://github.com/maxbbraun/sanoTTS), and [`festvox/flite`](https://github.com/festvox/flite).
+Clone this repo with its submodules [`karpathy/llama2.c`](https://github.com/karpathy/llama2.c), [`google-coral/coralmicro`](https://github.com/google-coral/coralmicro), [`ultralytics/ultralytics`](https://github.com/ultralytics/ultralytics), [`Ampixa/sanoTTS`](https://github.com/Ampixa/sanoTTS), and [`festvox/flite`](https://github.com/festvox/flite).
 
 ```bash
 git clone --recurse-submodules https://github.com/maxbbraun/llama4micro.git
