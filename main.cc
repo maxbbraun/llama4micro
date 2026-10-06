@@ -11,13 +11,14 @@
 #include "libs/tensorflow/utils.h"
 #include "libs/tpu/edgetpu_manager.h"
 #include "libs/tpu/edgetpu_op.h"
-#include "llama2.h"
-#include "speech/speech.h"
 #include "third_party/freertos_kernel/include/FreeRTOS.h"
 #include "third_party/freertos_kernel/include/task.h"
 #include "third_party/tflite-micro/tensorflow/lite/micro/micro_error_reporter.h"
 #include "third_party/tflite-micro/tensorflow/lite/micro/micro_interpreter.h"
 #include "third_party/tflite-micro/tensorflow/lite/micro/micro_mutable_op_resolver.h"
+
+#include "llama2.h"
+#include "speech/speech.h"
 #include "yolov8.h"
 
 using namespace coralmicro;
