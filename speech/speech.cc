@@ -121,7 +121,7 @@ bool SayChunk(const std::string& text, int depth) {
   int32_t ids[HEARTNANO_MAX_IDS];
   const int count = heartnano_text_to_ids(text.c_str(), ids, HEARTNANO_MAX_IDS);
   if (count < 0) {
-    // A long clause or spelled-out name can exceed the neural model's 207 IDs.
+    // A long clause can exceed the neural model's 207 IDs.
     // Retry smaller word-aligned pieces; never silently truncate the sentence.
     const size_t mid = text.size() / 2;
     size_t split = text.rfind(' ', mid);

@@ -14,11 +14,11 @@ extern "C" {
 
 // Converts text to Heartnano phoneme IDs.
 // - Normalizes supported Unicode punctuation and spacing.
-// - Spells unknown ASCII words letter by letter.
+// - Uses the dictionary, then Flite for unknown English words.
 // - Preserves IDs for supported ASCII text.
 // - Rejects invalid UTF-8, unsupported Unicode, and punctuation-only text.
 //
-// Limits: 512 UTF-8 bytes before and after rewriting; at most 207 output IDs.
+// Limits: 512 UTF-8 input bytes; at most 207 output IDs.
 // capacity must be at least 2.
 //
 // Returns: an ID count or a negative frontend error. NANO_LEX_E_CAP means a

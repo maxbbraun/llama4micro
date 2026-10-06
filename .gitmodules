@@ -9,4 +9,7 @@
 	url = https://github.com/ultralytics/ultralytics.git
 [submodule "sanoTTS"]
 	path = sanoTTS
-	url = https://github.com/Ampixa/sanoTTS.git
+	url = https://github.com/maxbbraun/sanoTTS.git
+[submodule "flite"]
+	path = flite
+	url = https://github.com/festvox/flite.git

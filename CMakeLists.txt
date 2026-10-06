@@ -19,6 +19,9 @@ add_executable_m7(llama4micro
     speech/speech.cc
     speech/dac_playback.cc
     speech/heartnano_convert.cc
+    speech/flite_phonemes.cc
+    flite/lang/cmulex/cmu_lts_model.c
+    flite/lang/cmulex/cmu_lts_rules.c
     sanoTTS/mcu/src/snt_nano.c
     sanoTTS/mcu/src/snt_kernels_ref.c
     sanoTTS/esphome/g2p/lex/nano_lex_g2p.c
@@ -40,6 +43,7 @@ target_link_libraries(llama4micro
 )
 
 target_include_directories(llama4micro PRIVATE
+    flite/include
     sanoTTS/mcu/include
     sanoTTS/mcu/models/en_us_e13b
     sanoTTS/esphome/g2p/lex

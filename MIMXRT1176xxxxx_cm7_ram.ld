@@ -239,6 +239,7 @@ SECTIONS
   /* Speech pronunciation tables and inference code use SDRAM. */
   .speech_data :
   {
+    *cmu_lts_*.obj(.rodata* .text*)
     *nano_lex_*.obj(.rodata* .text*)
     *snt_nano.c.obj(.rodata* .text*)
   } > m_sdram
