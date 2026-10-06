@@ -45,7 +45,7 @@ Export the [pretrained weights](https://github.com/ultralytics/assets/releases/d
 ```bash
 pip install torch==2.8.0 torchvision==0.23.0 \
     --index-url https://download.pytorch.org/whl/cpu
-pip install ultralytics==8.3.228 numpy==1.26.4 opencv-python==4.11.0.86 \
+pip install ./ultralytics numpy==1.26.4 opencv-python==4.11.0.86 \
     onnx==1.20.1 onnxsim==0.6.3 onnxruntime==1.24.3 \
     onnx2tf==1.26.3 tensorflow==2.19.1 tf_keras==2.19.0 \
     onnx_graphsurgeon==0.6.1 sng4onnx==2.0.1 protobuf==4.25.5

@@ -17,7 +17,7 @@ The LLM implementation itself is an adaptation of [llama2.c](https://github.com/
 
 ## Setup
 
-Clone this repo with its submodules [`karpathy/llama2.c`](https://github.com/karpathy/llama2.c) and [`google-coral/coralmicro`](https://github.com/google-coral/coralmicro).
+Clone this repo with its submodules [`karpathy/llama2.c`](https://github.com/karpathy/llama2.c), [`google-coral/coralmicro`](https://github.com/google-coral/coralmicro), and [`ultralytics/ultralytics`](https://github.com/ultralytics/ultralytics).
 
 ```bash
 git clone --recurse-submodules https://github.com/maxbbraun/llama4micro.git
