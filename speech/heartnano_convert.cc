@@ -27,13 +27,13 @@ int StrictTextToIds(const char* text, int32_t* ids, int capacity) {
   return result;
 }
 
-bool alpha(unsigned char c) {
+bool IsAsciiAlpha(unsigned char c) {
   return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
 }
 
 // Convert only an explicit set of typography to ASCII. The dictionary cannot
 // pronounce arbitrary Unicode words; reject those instead of deleting letters.
-int normalize(const char* text, size_t length) {
+int Normalize(const char* text, size_t length) {
   size_t out = 0;
   for (size_t pos = 0; pos < length;) {
     const unsigned char lead = static_cast<unsigned char>(text[pos]);
@@ -86,6 +86,7 @@ int normalize(const char* text, size_t length) {
     } else {
       return HEARTNANO_E_OOV;
     }
+
     // Every mapping is no longer than its UTF-8 input, so this stays bounded.
     normalized[out++] = replacement;
   }
@@ -93,7 +94,7 @@ int normalize(const char* text, size_t length) {
   return NANO_LEX_OK;
 }
 
-bool has_phoneme(const int32_t* ids, int count) {
+bool HasPhoneme(const int32_t* ids, int count) {
   // IDs 13..53 and 56..58 are vowels/consonants in the 62-symbol voice.
   // Exclude framing, whitespace, punctuation, and stress-only markers.
   for (int i = 0; i < count; ++i) {
@@ -103,20 +104,20 @@ bool has_phoneme(const int32_t* ids, int count) {
   return false;
 }
 
-int bounded_error(int error) {
+int BoundedError(int error) {
   if (error == NANO_LEX_E_TEXT_LONG || error == NANO_LEX_E_TOKENS ||
       error == NANO_LEX_E_ARENA)
     return NANO_LEX_E_CAP;
   return error;
 }
 
-int fail(int error, int32_t* ids, int capacity) {
+int Fail(int error, int32_t* ids, int capacity) {
   rewritten[0] = '\0';
   if (ids && capacity > 0) ids[0] = 0;
-  return bounded_error(error);
+  return BoundedError(error);
 }
 
-bool append(char c, size_t* length) {
+bool Append(char c, size_t* length) {
   if (*length >= NANO_LEX_MAX_CHARS) return false;
   rewritten[(*length)++] = c;
   rewritten[*length] = '\0';
@@ -128,41 +129,43 @@ bool append(char c, size_t* length) {
 extern "C" int heartnano_text_to_ids(const char* text, int32_t* ids,
                                      int capacity) {
   rewritten[0] = '\0';
-  if (!text || !ids) return fail(NANO_LEX_E_NULL_ARG, ids, capacity);
-  if (capacity < 2) return fail(NANO_LEX_E_BAD_CAP, ids, capacity);
+  if (!text || !ids) return Fail(NANO_LEX_E_NULL_ARG, ids, capacity);
+  if (capacity < 2) return Fail(NANO_LEX_E_BAD_CAP, ids, capacity);
   size_t length = 0;
   while (length <= NANO_LEX_MAX_CHARS && text[length]) ++length;
-  if (length > NANO_LEX_MAX_CHARS) return fail(NANO_LEX_E_CAP, ids, capacity);
-  const int normalization = normalize(text, length);
-  if (normalization < 0) return fail(normalization, ids, capacity);
+  if (length > NANO_LEX_MAX_CHARS) return Fail(NANO_LEX_E_CAP, ids, capacity);
+  const int normalization = Normalize(text, length);
+  if (normalization < 0) return Fail(normalization, ids, capacity);
   text = normalized;
   length = strlen(text);
   const int cap = capacity < HEARTNANO_MAX_IDS ? capacity : HEARTNANO_MAX_IDS;
   int result = StrictTextToIds(text, ids, cap);
   if (result >= 0) {
-    if (!has_phoneme(ids, result))
-      return fail(NANO_LEX_E_NO_SYMBOLS, ids, capacity);
+    if (!HasPhoneme(ids, result))
+      return Fail(NANO_LEX_E_NO_SYMBOLS, ids, capacity);
     return result;
   }
+
   // An all-unknown phrase may have no symbols, before strict OOV checking.
   if (result != HEARTNANO_E_OOV && result != NANO_LEX_E_NO_SYMBOLS)
-    return fail(result, ids, capacity);
+    return Fail(result, ids, capacity);
 
   size_t out = 0;
   for (size_t pos = 0; pos < length;) {
-    if (!alpha(static_cast<unsigned char>(text[pos]))) {
+    if (!IsAsciiAlpha(static_cast<unsigned char>(text[pos]))) {
       // Keep already-supported ASCII text byte-for-byte above. When a quoted
       // token fails lookup (e.g. Hello,"Her), quotes must separate words rather
       // than remain attached to the dictionary key. Do not alter apostrophes.
       const char c = text[pos++];
-      if (!append(c == '"' ? ' ' : c, &out))
-        return fail(NANO_LEX_E_CAP, ids, capacity);
+      if (!Append(c == '"' ? ' ' : c, &out))
+        return Fail(NANO_LEX_E_CAP, ids, capacity);
       continue;
     }
     size_t end = pos + 1;
-    while (end < length && (alpha(static_cast<unsigned char>(text[end])) ||
-                            (text[end] == '\'' && end + 1 < length &&
-                             alpha(static_cast<unsigned char>(text[end + 1])))))
+    while (end < length &&
+           (IsAsciiAlpha(static_cast<unsigned char>(text[end])) ||
+            (text[end] == '\'' && end + 1 < length &&
+             IsAsciiAlpha(static_cast<unsigned char>(text[end + 1])))))
       ++end;
     const size_t n = end - pos;
     memcpy(word, text + pos, n);
@@ -170,20 +173,20 @@ extern "C" int heartnano_text_to_ids(const char* text, int32_t* ids,
     const int check = StrictTextToIds(word, word_ids, HEARTNANO_MAX_IDS);
     const bool unknown =
         check == HEARTNANO_E_OOV || check == NANO_LEX_E_NO_SYMBOLS;
-    if (check < 0 && !unknown) return fail(check, ids, capacity);
+    if (check < 0 && !unknown) return Fail(check, ids, capacity);
     for (size_t i = pos; i < end; ++i) {
       // Spell the complete unknown word; retain its internal apostrophes.
-      if (unknown && i != pos && !append(' ', &out))
-        return fail(NANO_LEX_E_CAP, ids, capacity);
+      if (unknown && i != pos && !Append(' ', &out))
+        return Fail(NANO_LEX_E_CAP, ids, capacity);
       char c = text[i];
       if (unknown && c >= 'a' && c <= 'z') c = static_cast<char>(c - 'a' + 'A');
-      if (!append(c, &out)) return fail(NANO_LEX_E_CAP, ids, capacity);
+      if (!Append(c, &out)) return Fail(NANO_LEX_E_CAP, ids, capacity);
     }
     pos = end;
   }
   result = StrictTextToIds(rewritten, ids, cap);
-  if (result < 0) return fail(result, ids, capacity);
-  if (!has_phoneme(ids, result))
-    return fail(NANO_LEX_E_NO_SYMBOLS, ids, capacity);
+  if (result < 0) return Fail(result, ids, capacity);
+  if (!HasPhoneme(ids, result))
+    return Fail(NANO_LEX_E_NO_SYMBOLS, ids, capacity);
   return result;
 }

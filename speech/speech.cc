@@ -34,6 +34,7 @@ constexpr size_t kMaxSamples = 24 * kRate;
 constexpr size_t kChunkChars = 120;
 constexpr size_t kMaxChunkChars = 480;
 constexpr UBaseType_t kQueueDepth = 2;
+
 // The recursive fallback retains a phoneme array at each depth.
 constexpr size_t kWorkerStackWords = 4096;
 constexpr UBaseType_t kWorkerPriority = coralmicro::kAppTaskPriority;
@@ -44,6 +45,7 @@ struct WorkItem {
   bool barrier;
   char text[kMaxChunkChars + 1];
 };
+
 StaticQueue_t queue_storage;
 uint8_t queue_items[kQueueDepth * sizeof(WorkItem)];
 StaticSemaphore_t completion_storage;
@@ -54,6 +56,7 @@ TaskHandle_t producer_task = nullptr;
 UBaseType_t producer_priority = 0;
 bool async_active = false;  // Producer task only.
 bool producer_ok = true;    // Producer task only.
+
 // Published by the worker before giving the completion semaphore.
 volatile bool completed_ok = true;
 std::string pending;
@@ -69,10 +72,12 @@ bool LoadBlob(const char* path, size_t bytes, std::vector<uint8_t>* buffer,
     printf("ERROR: Missing or incorrectly sized speech model: %s\n", path);
     return false;
   }
+
   // The runtime's weight pointers must be 16-byte aligned.
   buffer->resize(bytes + 15);
   auto* aligned = reinterpret_cast<uint8_t*>(
-      (reinterpret_cast<uintptr_t>(buffer->data()) + 15) & ~uintptr_t(15));
+      (reinterpret_cast<uintptr_t>(buffer->data()) + 15) &
+      ~static_cast<uintptr_t>(15));
   if (coralmicro::LfsReadFile(path, aligned, bytes) != bytes) {
     printf("ERROR: Failed to load speech model: %s\n", path);
     return false;
@@ -85,9 +90,10 @@ struct Capture {
   int16_t* pcm;
   size_t count;
 };
+
 int CapturePcm(const float* pcm, int n, void* user) {
   auto* c = static_cast<Capture*>(user);
-  if (n < 0 || c->count + size_t(n) > kMaxSamples) return 1;
+  if (n < 0 || c->count + static_cast<size_t>(n) > kMaxSamples) return 1;
   for (int i = 0; i < n; ++i) {
     if (!std::isfinite(pcm[i])) return 1;
     const float bounded = std::max(-1.0f, std::min(1.0f, pcm[i]));
@@ -141,15 +147,15 @@ bool SayChunk(const std::string& text, int depth) {
   cfg.front_blob = speech_front;
   cfg.dec_blob = speech_decoder;
   cfg.arena = reinterpret_cast<void*>((reinterpret_cast<uintptr_t>(raw) + 15) &
-                                      ~uintptr_t(15));
+                                      ~static_cast<uintptr_t>(15));
   cfg.arena_size = kArenaBytes;
   cfg.noise_seed = 2236265385529901705ULL;
   snt_nano_stats synth{};
   const int rc =
       snt_nano_synthesize(&cfg, ids, count, CapturePcm, &capture, &synth);
   free(raw);
-  bool ok =
-      rc == 0 && capture.count > 0 && capture.count == size_t(synth.samples);
+  bool ok = rc == 0 && capture.count > 0 &&
+            capture.count == static_cast<size_t>(synth.samples);
   if (!ok) {
     printf("ERROR: Speech synthesis failed (%d).\n", rc);
   } else {
@@ -159,6 +165,7 @@ bool SayChunk(const std::string& text, int depth) {
   free(capture.pcm);
   return ok;
 }
+
 // A barrier is queued after the final sentence. FIFO order plus the semaphore
 // means Flush cannot finish until the DAC has played every preceding sample.
 void Worker(void*) {
@@ -213,6 +220,7 @@ void SubmitChunk(const std::string& text) {
     producer_ok = ok && producer_ok;
     return;
   }
+
   // Append bounds each chunk before it gets here; copy into the queue, never
   // retain the tokenizer's temporary piece or a pointer into pending.
   configASSERT(text.size() <= kMaxChunkChars);
@@ -259,6 +267,7 @@ bool BeginAsync() {
   producer_task = xTaskGetCurrentTaskHandle();
   producer_priority = uxTaskPriorityGet(producer_task);
   async_active = true;
+
   // Time slicing is disabled in this SDK. Keep USB/PMIC above the worker, and
   // let LLM computation use the CPU whenever playback puts the worker to sleep.
   vTaskPrioritySet(producer_task, kWorkerPriority - 1);
@@ -267,6 +276,7 @@ bool BeginAsync() {
 
 void Append(const char* piece, void*) {
   if (!piece) return;
+
   // Decode may return multiple characters in one token. Preserve all of them.
   for (const char* p = piece; *p; ++p) {
     pending += *p;

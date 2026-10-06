@@ -21,6 +21,7 @@ bool g_initialized = false;
 
 void Init() {
   if (g_initialized) return;
+
   // Keep the same DAC reference selection as coralmicro::DacInit(). Enable the
   // analog output buffer to drive the amplifier input and select fast settling.
   dac12_config_t dac{};
@@ -35,6 +36,7 @@ void Init() {
   pit_config_t pit{};
   PIT_GetDefaultConfig(&pit);
   PIT_Init(PIT1, &pit);
+
   // No RTOS APIs in this ISR. Priority 1 remains responsive while FreeRTOS
   // masks kernel-aware interrupts
   // (configLIBRARY_MAX_SYSCALL_INTERRUPT_PRIORITY=2).
@@ -46,23 +48,23 @@ void Init() {
 }
 
 bool PlayCodes(const uint16_t* codes, size_t count) {
-  constexpr uint32_t rate = audio_playback::kSampleRate;
+  constexpr uint32_t kRate = audio_playback::kSampleRate;
   if (!codes || !count || !g_done) return false;
   Init();
   const uint32_t bus_hz = CLOCK_GetRootClockFreq(kCLOCK_Root_Bus);
-  if (!bus_hz || bus_hz % rate != 0) return false;
+  if (!bus_hz || bus_hz % kRate != 0) return false;
   PIT_StopTimer(PIT1, kPIT_Chnl_0);
   PIT_DisableInterrupts(PIT1, kPIT_Chnl_0, kPIT_TimerInterruptEnable);
   PIT_ClearStatusFlags(PIT1, kPIT_Chnl_0, kPIT_TimerFlag);
   NVIC_ClearPendingIRQ(PIT1_IRQn);
-  PIT_SetTimerPeriod(PIT1, kPIT_Chnl_0, bus_hz / rate);
+  PIT_SetTimerPeriod(PIT1, kPIT_Chnl_0, bus_hz / kRate);
   g_next = codes;
   g_remaining = count;
   g_done = false;
   __DMB();
   const uint64_t started = coralmicro::TimerMicros();
   const uint64_t timeout_us =
-      static_cast<uint64_t>(count) * 1000000 / rate + 2000000;
+      static_cast<uint64_t>(count) * 1000000 / kRate + 2000000;
   PIT_EnableInterrupts(PIT1, kPIT_Chnl_0, kPIT_TimerInterruptEnable);
   PIT_StartTimer(PIT1, kPIT_Chnl_0);
   while (!g_done && coralmicro::TimerMicros() - started < timeout_us) {
@@ -76,11 +78,12 @@ bool PlayCodes(const uint16_t* codes, size_t count) {
   g_next = nullptr;
   g_remaining = 0;
   g_done = true;
+
+  // Leave DAC biased at midpoint between utterances to avoid repeated pops.
   DAC12_SetData(DAC, kMidpoint);
   PIT_ClearStatusFlags(PIT1, kPIT_Chnl_0, kPIT_TimerFlag);
   NVIC_ClearPendingIRQ(PIT1_IRQn);
   EnableIRQ(PIT1_IRQn);
-  // Leave DAC biased at midpoint between utterances to avoid repeated pops.
   return finished;
 }
 
@@ -110,6 +113,7 @@ extern "C" void PIT1_IRQHandler() {
     PIT_DisableInterrupts(PIT1, kPIT_Chnl_0, kPIT_TimerInterruptEnable);
     g_done = true;
   }
+
   // Prevent a second entry before the peripheral has observed flag clearing.
   __DSB();
 }
@@ -122,10 +126,11 @@ bool PlayPcm16(const int16_t* pcm, size_t samples) {
     return false;
   auto* codes = static_cast<uint16_t*>(malloc(samples * sizeof(uint16_t)));
   if (!codes) return false;
+
   // Keep the tested Q15 unity gain; volume is set on the amplifier.
-  constexpr float gain = 32767.0f / 32768.0f;
+  constexpr float kGain = 32767.0f / 32768.0f;
   for (size_t i = 0; i < samples; ++i) {
-    codes[i] = Code(pcm[i] / 32768.0f * gain * Fade(i, samples, kSampleRate));
+    codes[i] = Code(pcm[i] / 32768.0f * kGain * Fade(i, samples, kSampleRate));
   }
   const bool ok = PlayCodes(codes, samples);
   free(codes);

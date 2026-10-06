@@ -11,6 +11,7 @@ bool LoadModel(const char* front_path, const char* decoder_path);
 // synchronous speech if the worker cannot be created.
 bool BeginAsync();
 void Append(const char* piece, void* unused);
+
 // Submit the final partial sentence and wait until all audio has played.
 // Restores the producer priority and reports any synthesis/playback failure.
 bool Flush();
