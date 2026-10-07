@@ -5,14 +5,14 @@ This directory contains the pre-trained model weights and metadata. See instruct
 Some of the tools use Python. Install their dependencies:
 
 ```bash
-python3 -m venv venv
+python3.12 -m venv venv
 . venv/bin/activate
 
 pip install -r llama2.c/requirements.txt
 pip install -r models/yolov8/requirements.txt
 ```
 
-Install the Edge TPU Compiler using the [official instructions](https://coral.ai/docs/edgetpu/compiler/#download).
+[Install](https://coral.ai/docs/edgetpu/compiler/#download) Edge TPU Compiler 14.1.317412892.
 
 ### Llama
 
@@ -42,7 +42,7 @@ cp llama2.c/tokenizer.bin models/${LLAMA_MODEL_DIR}/
 
 Object detection (with labels used for prompting Llama) uses [YOLOv8n](https://github.com/ultralytics/ultralytics), the smallest (nano) variant, at a 224x224 resolution with the 80 [COCO](https://cocodataset.org/) classes. The network runs on the [Coral Edge TPU](https://coral.ai/technology/); box decoding and non-maximum suppression run on the Arm Cortex-M7 CPU.
 
-Export the [pretrained weights](https://github.com/ultralytics/assets/releases/download/v8.3.0/yolov8n.pt) on x86-64 Linux with Python 3.12 and [Edge TPU Compiler](https://coral.ai/docs/edgetpu/compiler/) 14.1.317412892:
+Export the [pretrained weights](https://github.com/ultralytics/assets/releases/download/v8.3.0/yolov8n.pt):
 
 ```bash
 pip install -r models/yolov8/requirements.txt
