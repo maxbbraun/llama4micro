@@ -9,8 +9,10 @@ python3 -m venv venv
 . venv/bin/activate
 
 pip install -r llama2.c/requirements.txt
-
+pip install -r models/yolov8/requirements.txt
 ```
+
+Install the Edge TPU Compiler using the [official instructions](https://coral.ai/docs/edgetpu/compiler/#download).
 
 ### Llama
 
@@ -43,12 +45,7 @@ Object detection (with labels used for prompting Llama) uses [YOLOv8n](https://g
 Export the [pretrained weights](https://github.com/ultralytics/assets/releases/download/v8.3.0/yolov8n.pt) on x86-64 Linux with Python 3.12 and [Edge TPU Compiler](https://coral.ai/docs/edgetpu/compiler/) 14.1.317412892:
 
 ```bash
-pip install torch==2.8.0 torchvision==0.23.0 \
-    --index-url https://download.pytorch.org/whl/cpu
-pip install ./ultralytics numpy==1.26.4 opencv-python==4.11.0.86 \
-    onnx==1.20.1 onnxsim==0.6.3 onnxruntime==1.24.3 \
-    onnx2tf==1.26.3 tensorflow==2.19.1 tf_keras==2.19.0 \
-    onnx_graphsurgeon==0.6.1 sng4onnx==2.0.1 protobuf==4.25.5
+pip install -r models/yolov8/requirements.txt
 
 mkdir -p build/yolov8
 wget -O build/yolov8/yolov8n.pt \
