@@ -2,8 +2,6 @@
 
 #include <algorithm>
 #include <cmath>
-#include <cstdlib>
-#include <limits>
 
 #include "libs/base/timer.h"
 #include "third_party/freertos_kernel/include/FreeRTOS.h"
@@ -14,7 +12,7 @@
 namespace {
 
 constexpr uint32_t kMidpoint = 2048;
-const uint16_t* volatile g_next = nullptr;
+const int16_t* volatile g_next = nullptr;
 volatile size_t g_remaining = 0;
 volatile bool g_done = true;
 bool g_initialized = false;
@@ -49,7 +47,7 @@ void Init() {
   vTaskDelay(pdMS_TO_TICKS(10));
 }
 
-bool PlayCodes(const uint16_t* codes, size_t count) {
+bool PlayCodes(const int16_t* codes, size_t count) {
   constexpr uint32_t kSampleRateHz = speech::kSampleRateHz;
   constexpr uint64_t kPlaybackTimeoutMarginUs = 2000000;
   if (!codes || !count || !g_done) {
@@ -131,22 +129,15 @@ extern "C" void PIT1_IRQHandler() {
 
 namespace speech {
 
-bool PlayPcm16(const int16_t* pcm, size_t samples) {
-  if (!pcm || !samples ||
-      samples > std::numeric_limits<size_t>::max() / sizeof(uint16_t)) {
-    return false;
-  }
-  auto* codes = static_cast<uint16_t*>(malloc(samples * sizeof(uint16_t)));
-  if (!codes) {
+bool PlayPcm16(int16_t* pcm, size_t samples) {
+  if (!pcm || !samples) {
     return false;
   }
 
   for (size_t i = 0; i < samples; ++i) {
-    codes[i] = Code(pcm[i] / 32768.0f * Fade(i, samples, kSampleRateHz));
+    pcm[i] = Code(pcm[i] / 32768.0f * Fade(i, samples, kSampleRateHz));
   }
-  const bool ok = PlayCodes(codes, samples);
-  free(codes);
-  return ok;
+  return PlayCodes(pcm, samples);
 }
 
 }  // namespace speech
