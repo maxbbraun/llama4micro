@@ -104,7 +104,8 @@ float Fade(size_t i, size_t count, uint32_t sample_rate_hz) {
 
 uint16_t Code(float sample) {
   sample = std::clamp(sample, -1.0f, 1.0f);
-  return static_cast<uint16_t>(2048 + std::lrintf(sample * 2047));
+  return static_cast<uint16_t>(kMidpoint +
+                               std::lrintf(sample * (kMidpoint - 1)));
 }
 
 }  // namespace
