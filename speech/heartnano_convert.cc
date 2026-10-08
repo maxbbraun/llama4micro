@@ -24,9 +24,6 @@ int StrictTextToIds(const char* text, int32_t* ids, int capacity) {
       result = kErrorDropped;
     }
   }
-  if (result < 0 && ids && capacity > 0) {
-    ids[0] = 0;
-  }
   return result;
 }
 
