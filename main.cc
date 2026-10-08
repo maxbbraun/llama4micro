@@ -136,6 +136,17 @@ std::string TakePicture() {
   printf(">>> Taking picture...\n");
   int64_t timer_start = TimerMillis();
 
+  // Also clean up partially completed camera startup on an early return.
+  struct CameraCleanup {
+    bool active = true;
+    ~CameraCleanup() {
+      if (active) {
+        CameraTask::GetSingleton()->Disable();
+        CameraTask::GetSingleton()->SetPower(false);
+      }
+    }
+  } camera_cleanup;
+
   // Turn on the camera.
   if (!CameraTask::GetSingleton()->SetPower(true)) {
     printf("ERROR: Failed to power on camera\n");
@@ -187,6 +198,7 @@ std::string TakePicture() {
   // Turn off the camera.
   CameraTask::GetSingleton()->Disable();
   CameraTask::GetSingleton()->SetPower(false);
+  camera_cleanup.active = false;
 
   // Run the object vision model on the image.
   if (tf_interpreter.Invoke() != kTfLiteOk) {
