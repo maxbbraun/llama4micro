@@ -97,14 +97,13 @@ float Fade(size_t i, size_t count, uint32_t sample_rate_hz) {
   constexpr uint32_t kFadeDurationMs = 5;
   const size_t fade_samples =
       static_cast<uint64_t>(sample_rate_hz) * kFadeDurationMs / 1000;
-  const size_t ramp =
-      std::max<size_t>(1, std::min<size_t>(fade_samples, count / 2));
+  const size_t ramp = std::clamp<size_t>(count / 2, 1, fade_samples);
   const size_t edge = std::min(i, count - 1 - i);
   return static_cast<float>(std::min(edge, ramp)) / ramp;
 }
 
 uint16_t Code(float sample) {
-  sample = std::max(-1.0f, std::min(1.0f, sample));
+  sample = std::clamp(sample, -1.0f, 1.0f);
   return static_cast<uint16_t>(2048 + std::lrintf(sample * 2047));
 }
 

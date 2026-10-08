@@ -100,7 +100,7 @@ int CapturePcm(const float* pcm, int n, void* user) {
     if (!std::isfinite(pcm[i])) {
       return 1;
     }
-    const float bounded = std::max(-1.0f, std::min(1.0f, pcm[i]));
+    const float bounded = std::clamp(pcm[i], -1.0f, 1.0f);
     c->pcm[c->count++] = static_cast<int16_t>(std::lrintf(bounded * 32767));
   }
   return 0;
