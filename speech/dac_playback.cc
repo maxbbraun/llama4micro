@@ -47,10 +47,11 @@ void Init() {
   vTaskDelay(pdMS_TO_TICKS(10));
 }
 
-bool PlayCodes(const int16_t* codes, size_t count) {
+bool PlayCodes(const int16_t* codes, size_t count,
+               const std::atomic<bool>& cancelled) {
   constexpr uint32_t kSampleRateHz = speech::kSampleRateHz;
   constexpr uint64_t kPlaybackTimeoutMarginUs = 2000000;
-  if (!codes || !count || !g_done) {
+  if (!codes || !count || !g_done || cancelled) {
     return false;
   }
   Init();
@@ -76,7 +77,7 @@ bool PlayCodes(const int16_t* codes, size_t count) {
       kPlaybackTimeoutMarginUs;
   PIT_EnableInterrupts(PIT1, kPIT_Chnl_0, kPIT_TimerInterruptEnable);
   PIT_StartTimer(PIT1, kPIT_Chnl_0);
-  while (!g_done &&
+  while (!g_done && !cancelled &&
          static_cast<uint32_t>(coralmicro::TimerMicros()) - started_us <
              timeout_us) {
     vTaskDelay(pdMS_TO_TICKS(1));
@@ -134,15 +135,16 @@ extern "C" void PIT1_IRQHandler() {
 
 namespace speech {
 
-bool PlayPcm16(int16_t* pcm, size_t samples) {
-  if (!pcm || !samples) {
+bool PlayPcm16(int16_t* pcm, size_t samples,
+               const std::atomic<bool>& cancelled) {
+  if (!pcm || !samples || cancelled) {
     return false;
   }
 
   for (size_t i = 0; i < samples; ++i) {
     pcm[i] = Code(pcm[i] / 32768.0f * Fade(i, samples, kSampleRateHz));
   }
-  return PlayCodes(pcm, samples);
+  return PlayCodes(pcm, samples, cancelled);
 }
 
 }  // namespace speech

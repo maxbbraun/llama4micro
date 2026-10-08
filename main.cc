@@ -1,3 +1,4 @@
+#include <atomic>
 #include <cstdio>
 #include <cstdlib>
 #include <sstream>
@@ -14,6 +15,7 @@
 #include "libs/tpu/edgetpu_op.h"
 #include "third_party/freertos_kernel/include/FreeRTOS.h"
 #include "third_party/freertos_kernel/include/task.h"
+#include "third_party/freertos_kernel/include/timers.h"
 #include "third_party/tflite-micro/tensorflow/lite/micro/micro_error_reporter.h"
 #include "third_party/tflite-micro/tensorflow/lite/micro/micro_interpreter.h"
 #include "third_party/tflite-micro/tensorflow/lite/micro/micro_mutable_op_resolver.h"
@@ -66,6 +68,13 @@ const float kMinBboxSize = 0.1f;
 
 // Debounce interval for the button interrupt.
 const uint64_t kButtonDebounceUs = 50000;
+
+// A fresh press during a story cancels it after a one-second hold.
+constexpr uint32_t kCancelHoldMs = 1000;
+std::atomic<bool> story_active{false};
+std::atomic<TickType_t> button_pressed_at{0};
+StaticTimer_t cancel_timer_storage;
+TimerHandle_t cancel_timer;
 
 // Loads the Llama model and tokenizer into memory and sets up data structures.
 void LoadLlamaModel() {
@@ -218,15 +227,23 @@ std::string TakePicture() {
 void TellStory(std::string prompt) {
   printf(">>> Generating tokens...\n");
 
-  float tokens_s;
+  float tokens_s = 0;
   speech::BeginAsync();
+  story_active = true;
   generate(&transformer, &tokenizer, &sampler, prompt.c_str(), steps,
-           group_size, &tokens_s, speech::Append);
+           group_size, &tokens_s, speech::Append, speech::Cancelled);
   if (!speech::Flush()) {
     printf("ERROR: Failed to play story\n");
   }
+  story_active = false;
+  const BaseType_t stopped = xTimerStop(cancel_timer, portMAX_DELAY);
+  configASSERT(stopped == pdPASS);
 
-  printf(">>> Averaged %.2f tokens/s\n", tokens_s);
+  if (speech::Cancelled()) {
+    printf(">>> Story cancelled\n");
+  } else {
+    printf(">>> Averaged %.2f tokens/s\n", tokens_s);
+  }
 }
 
 extern "C" [[noreturn]] void app_main(void* param) {
@@ -235,11 +252,33 @@ extern "C" [[noreturn]] void app_main(void* param) {
 
   // Set up the button interrupt.
   const TaskHandle_t app_task = xTaskGetCurrentTaskHandle();
+  cancel_timer = xTimerCreateStatic(
+      "cancel_story", pdMS_TO_TICKS(kCancelHoldMs), pdFALSE, nullptr,
+      [](TimerHandle_t) {
+        // GPIO reads use a mutex, so check the held button in task context.
+        const bool pressed = !GpioGet(Gpio::kUserButton);
+
+        // A new press must not replace the timestamp during this check.
+        taskENTER_CRITICAL();
+        if (pressed && story_active &&
+            xTaskGetTickCount() - button_pressed_at.load() >=
+                pdMS_TO_TICKS(kCancelHoldMs)) {
+          speech::Cancel();
+        }
+        taskEXIT_CRITICAL();
+      },
+      &cancel_timer_storage);
   GpioConfigureInterrupt(
       Gpio::kUserButton, GpioInterruptMode::kIntModeFalling,
       [app_task]() {
         BaseType_t woken = pdFALSE;
-        vTaskNotifyGiveFromISR(app_task, &woken);
+        if (story_active) {
+          button_pressed_at = xTaskGetTickCountFromISR();
+          const BaseType_t armed = xTimerResetFromISR(cancel_timer, &woken);
+          configASSERT(armed == pdPASS);
+        } else {
+          vTaskNotifyGiveFromISR(app_task, &woken);
+        }
         portYIELD_FROM_ISR(woken);
       },
       kButtonDebounceUs);

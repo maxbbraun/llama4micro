@@ -1,6 +1,7 @@
 #include "speech.h"
 
 #include <algorithm>
+#include <atomic>
 #include <cctype>
 #include <cmath>
 #include <cstdint>
@@ -56,6 +57,7 @@ SemaphoreHandle_t completion = nullptr;
 TaskHandle_t worker_task = nullptr;
 TaskHandle_t producer_task = nullptr;
 UBaseType_t producer_priority = 0;
+std::atomic<bool> cancelled{false};
 
 // Published by the worker before giving the completion semaphore.
 volatile bool completed_ok = true;
@@ -92,6 +94,9 @@ struct Capture {
 };
 
 int CapturePcm(const float* pcm, int n, void* user) {
+  if (cancelled) {
+    return 1;
+  }
   auto* c = static_cast<Capture*>(user);
   if (n < 0 || c->count + static_cast<size_t>(n) > kMaxSamples) {
     return 1;
@@ -116,6 +121,9 @@ bool HasWord(const char* s) {
 }
 
 bool SayChunk(const std::string& text, int depth) {
+  if (cancelled) {
+    return true;
+  }
   if (!speech_front || !speech_decoder) {
     printf("ERROR: Speech model is not loaded.\n");
     return false;
@@ -163,12 +171,16 @@ bool SayChunk(const std::string& text, int depth) {
   const int rc =
       snt_nano_synthesize(&cfg, ids, count, CapturePcm, &capture, &synth);
   free(raw);
+  if (cancelled) {
+    free(capture.pcm);
+    return true;
+  }
   bool ok = rc == 0 && capture.count > 0 &&
             capture.count == static_cast<size_t>(synth.samples);
   if (!ok) {
     printf("ERROR: Speech synthesis failed (%d).\n", rc);
   } else {
-    ok = speech::PlayPcm16(capture.pcm, capture.count);
+    ok = speech::PlayPcm16(capture.pcm, capture.count, cancelled) || cancelled;
     if (!ok) {
       printf("ERROR: Speech playback failed.\n");
     }
@@ -226,7 +238,7 @@ void QueueWork(const WorkItem& item) {
 }
 
 void SubmitChunk(const std::string& text) {
-  if (text.empty()) {
+  if (text.empty() || cancelled) {
     return;
   }
 
@@ -270,6 +282,7 @@ bool LoadModel(const char* front_path, const char* decoder_path) {
 
 void BeginAsync() {
   configASSERT(worker_task && !producer_task && pending.empty());
+  cancelled = false;
   producer_task = xTaskGetCurrentTaskHandle();
   producer_priority = uxTaskPriorityGet(producer_task);
 
@@ -278,9 +291,13 @@ void BeginAsync() {
   vTaskPrioritySet(producer_task, kWorkerPriority - 1);
 }
 
+void Cancel() { cancelled = true; }
+
+bool Cancelled() { return cancelled; }
+
 void Append(const char* piece) {
   configASSERT(producer_task == xTaskGetCurrentTaskHandle());
-  if (!piece) {
+  if (!piece || cancelled) {
     return;
   }
 
