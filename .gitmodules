@@ -4,6 +4,6 @@
 [submodule "coralmicro"]
 	path = coralmicro
 	url = git@github.com:google-coral/coralmicro.git
-[submodule "yolov5"]
-	path = yolov5
-	url = git@github.com:ultralytics/yolov5.git
+[submodule "ultralytics"]
+	path = ultralytics
+	url = https://github.com/ultralytics/ultralytics.git

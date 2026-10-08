@@ -21,8 +21,8 @@ add_executable_m7(llama4micro
     DATA
     ${PROJECT_SOURCE_DIR}/models/llama2/stories15M_q80.bin
     ${PROJECT_SOURCE_DIR}/models/llama2/tokenizer.bin
-    ${PROJECT_SOURCE_DIR}/models/yolov5/yolov5n-int8_edgetpu.tflite
-    ${PROJECT_SOURCE_DIR}/models/yolov5/coco_labels.txt
+    ${PROJECT_SOURCE_DIR}/models/yolov8/yolov8n-int8_edgetpu.tflite
+    ${PROJECT_SOURCE_DIR}/models/yolov8/coco_labels.txt
 )
 
 target_link_libraries(llama4micro
