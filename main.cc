@@ -1,4 +1,5 @@
 #include <cstdio>
+#include <cstdlib>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -99,7 +100,7 @@ void LoadVisionModel() {
   if (!LfsReadFile(kVisionModelPath, &vision_model_buffer)) {
     printf("ERROR: Failed to load vision model weights: %s\n",
            kVisionModelPath);
-    return;
+    std::exit(EXIT_FAILURE);
   }
 
   // Load the model labels.
@@ -107,7 +108,7 @@ void LoadVisionModel() {
   std::string vision_labels_buffer;
   if (!LfsReadFile(kVisionLabelsPath, &vision_labels_buffer)) {
     printf("ERROR: Failed to load vision labels: %s\n", kVisionLabelsPath);
-    return;
+    std::exit(EXIT_FAILURE);
   }
   std::istringstream labels_stream(vision_labels_buffer);
   std::string label;
@@ -124,7 +125,7 @@ void LoadVisionModel() {
 void LoadSpeechModel() {
   int64_t timer_start = TimerMillis();
   if (!speech::LoadModel(kSpeechFrontModelPath, kSpeechDecoderModelPath)) {
-    return;
+    std::exit(EXIT_FAILURE);
   }
   float timer_s = (TimerMillis() - timer_start) / 1000.0f;
   printf(">>> Speech model loading took %.2f s\n", timer_s);
