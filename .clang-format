@@ -1,4 +1,2 @@
 BasedOnStyle: Google
-AllowShortIfStatementsOnASingleLine: Never
 IncludeBlocks: Preserve
-InsertBraces: true

@@ -585,9 +585,7 @@ void encode(Tokenizer* t, const char *text, int8_t bos, int8_t eos, int *tokens,
     *n_tokens = 0;
 
     // add optional BOS (=1) token, if desired
-    if (bos) {
-        tokens[(*n_tokens)++] = 1;
-    }
+    if (bos) tokens[(*n_tokens)++] = 1;
 
     // add_dummy_prefix is true by default
     // so prepend a dummy prefix token to the input string, but only if text != ""
@@ -679,9 +677,7 @@ void encode(Tokenizer* t, const char *text, int8_t bos, int8_t eos, int *tokens,
     }
 
     // add optional EOS (=2) token, if desired
-    if (eos) {
-        tokens[(*n_tokens)++] = 2;
-    }
+    if (eos) tokens[(*n_tokens)++] = 2;
 
     free(str_buffer);
 }
@@ -732,12 +728,8 @@ int sample_mult(float* probabilities, int n, float coin) {
 int compare(const void* a, const void* b) {
     ProbIndex* a_ = (ProbIndex*) a;
     ProbIndex* b_ = (ProbIndex*) b;
-    if (a_->prob > b_->prob) {
-        return -1;
-    }
-    if (a_->prob < b_->prob) {
-        return 1;
-    }
+    if (a_->prob > b_->prob) return -1;
+    if (a_->prob < b_->prob) return 1;
     return 0;
 }
 
