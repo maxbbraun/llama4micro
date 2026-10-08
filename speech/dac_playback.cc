@@ -132,11 +132,8 @@ bool PlayPcm16(const int16_t* pcm, size_t samples) {
   auto* codes = static_cast<uint16_t*>(malloc(samples * sizeof(uint16_t)));
   if (!codes) return false;
 
-  // Keep the tested Q15 unity gain; volume is set on the amplifier.
-  constexpr float kGain = 32767.0f / 32768.0f;
   for (size_t i = 0; i < samples; ++i) {
-    codes[i] =
-        Code(pcm[i] / 32768.0f * kGain * Fade(i, samples, kSampleRateHz));
+    codes[i] = Code(pcm[i] / 32768.0f * Fade(i, samples, kSampleRateHz));
   }
   const bool ok = PlayCodes(codes, samples);
   free(codes);
