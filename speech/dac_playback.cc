@@ -48,7 +48,7 @@ void Init() {
 }
 
 bool PlayCodes(const uint16_t* codes, size_t count) {
-  constexpr uint32_t kSampleRateHz = audio_playback::kSampleRateHz;
+  constexpr uint32_t kSampleRateHz = dac_playback::kSampleRateHz;
   constexpr uint64_t kPlaybackTimeoutMarginUs = 2000000;
   if (!codes || !count || !g_done) return false;
   Init();
@@ -123,7 +123,7 @@ extern "C" void PIT1_IRQHandler() {
   __DSB();
 }
 
-namespace audio_playback {
+namespace dac_playback {
 
 bool PlayPcm16(const int16_t* pcm, size_t samples) {
   if (!pcm || !samples ||
@@ -143,4 +143,4 @@ bool PlayPcm16(const int16_t* pcm, size_t samples) {
   return ok;
 }
 
-}  // namespace audio_playback
+}  // namespace dac_playback
