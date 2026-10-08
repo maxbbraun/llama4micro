@@ -13,9 +13,8 @@ bool LoadModel(const char* front_path, const char* decoder_path);
 void BeginAsync();
 
 // Append a tokenizer piece, submitting complete sentences or bounded chunks.
-// Copies text before returning; may block while speech catches up. The callback
-// context is unused.
-void Append(const char* piece, void* unused);
+// Copies text before returning; may block while speech catches up.
+void Append(const char* piece);
 
 // Submit the final partial sentence and wait until all audio has played.
 // Restores the producer priority and reports any synthesis/playback failure.

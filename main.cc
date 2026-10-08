@@ -245,7 +245,7 @@ void TellStory(std::string prompt) {
   float tokens_s;
   speech::BeginAsync();
   generate(&transformer, &tokenizer, &sampler, prompt.c_str(), steps,
-           group_size, &tokens_s, speech::Append, nullptr);
+           group_size, &tokens_s, speech::Append);
   if (!speech::Flush()) {
     printf("ERROR: Failed to play story\n");
   }

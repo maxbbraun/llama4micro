@@ -278,7 +278,7 @@ void BeginAsync() {
   vTaskPrioritySet(producer_task, kWorkerPriority - 1);
 }
 
-void Append(const char* piece, void*) {
+void Append(const char* piece) {
   configASSERT(producer_task == xTaskGetCurrentTaskHandle());
   if (!piece) {
     return;
