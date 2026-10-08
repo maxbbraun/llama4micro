@@ -286,11 +286,29 @@ void Append(const char* piece) {
 
   // Decode may return multiple characters in one token. Preserve all of them.
   for (const char* p = piece; *p; ++p) {
+    // A letter after a single-letter initial may begin another initial.
+    // If it grows into a word ("A.Beta"), restore the sentence boundary.
+    if (pending.size() >= 2 && pending[pending.size() - 2] == '.' &&
+        std::isalpha(static_cast<unsigned char>(pending.back())) &&
+        std::isalnum(static_cast<unsigned char>(*p))) {
+      const char letter = pending.back();
+      pending.pop_back();
+      SubmitPending();
+      pending += letter;
+    }
+
     // Wait for the next character, even across callbacks, to distinguish a
     // sentence-ending period from a decimal point (including leading .5).
     if (!pending.empty() && pending.back() == '.' &&
         !std::isdigit(static_cast<unsigned char>(*p))) {
-      SubmitPending();
+      const size_t dot = pending.size() - 1;
+      const bool initial =
+          dot > 0 && std::isalpha(static_cast<unsigned char>(pending[dot - 1])) &&
+          (dot == 1 ||
+           !std::isalnum(static_cast<unsigned char>(pending[dot - 2])));
+      if (!initial || !std::isalpha(static_cast<unsigned char>(*p))) {
+        SubmitPending();
+      }
     }
     pending += *p;
     if (*p == '!' || *p == '?' || *p == '\n') {
