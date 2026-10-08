@@ -66,7 +66,7 @@ python ../coralmicro/scripts/flashtool.py \
 ## Usage
 
 1. The models load automatically when the board powers up.
-   - This takes ~7 seconds.
+   - This takes ~8 seconds.
    - The green light will turn on when ready.
 2. Point the camera at an object and press the button.
    - The green light will turn off.
