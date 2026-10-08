@@ -41,9 +41,6 @@ def export_model():
 
     # Keep box decoding on the CPU; export logits and class probabilities.
     head = model.model[-1]
-    head.export = True
-    head.format = 'tflite'
-    head.dynamic = False
     head.forward = types.MethodType(raw_heads, head)
     path = BUILD / 'yolov8n.onnx'
     torch.onnx.export(
