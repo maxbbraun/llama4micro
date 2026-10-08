@@ -60,7 +60,6 @@ const char* kSpeechDecoderModelPath = "/models/sanotts/model_q8.bin";
 
 // Camera and object detection configuration.
 CameraFrameFormat frame_format;
-const int kDiscardFrames = 30;
 const float kConfidenceThreshold = 0.25f;
 const float kMinBboxSize = 0.1f;
 
