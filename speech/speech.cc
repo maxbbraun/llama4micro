@@ -1,6 +1,7 @@
 #include "speech.h"
 
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
@@ -107,8 +108,7 @@ int CapturePcm(const float* pcm, int n, void* user) {
 
 bool HasWord(const char* s) {
   for (; *s; ++s) {
-    if ((*s >= 'A' && *s <= 'Z') || (*s >= 'a' && *s <= 'z') ||
-        (*s >= '0' && *s <= '9')) {
+    if (std::isalnum(static_cast<unsigned char>(*s))) {
       return true;
     }
   }
