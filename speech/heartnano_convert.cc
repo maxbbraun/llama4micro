@@ -6,19 +6,22 @@
 
 namespace {
 
+constexpr int kErrorOov = -101;
+constexpr int kErrorDropped = -102;
+
 char normalized[NANO_LEX_MAX_CHARS + 1];
 
 // Reject partial conversions rather than silently omitting words or sounds.
 int StrictTextToIds(const char* text, int32_t* ids, int capacity) {
   nano_lex_g2p_stats_t local = {};
-  int cap = capacity > HEARTNANO_MAX_IDS ? HEARTNANO_MAX_IDS : capacity;
+  int cap = capacity > NANO_LEX_MAX_TOKENS ? NANO_LEX_MAX_TOKENS : capacity;
   int result = nano_lex_g2p_text_to_ids(text, ids, cap);
   if (result >= 0) {
     nano_lex_g2p_get_stats(&local);
     if (local.oov_words) {
-      result = HEARTNANO_E_OOV;
+      result = kErrorOov;
     } else if (local.dropped) {
-      result = HEARTNANO_E_DROPPED;
+      result = kErrorDropped;
     }
   }
   if (result < 0 && ids && capacity > 0) {
@@ -86,7 +89,7 @@ int Normalize(const char* text, size_t length) {
     } else if (cp == 0x2212) {
       replacement = '-';  // A mathematical minus is not a prose separator.
     } else {
-      return HEARTNANO_E_OOV;
+      return kErrorOov;
     }
 
     // Every mapping is no longer than its UTF-8 input, so this stays bounded.
@@ -148,7 +151,7 @@ extern "C" int heartnano_text_to_ids(const char* text, int32_t* ids,
 
   // Retry attached quotes as word separators when lookup failed. Successful
   // conversions stay unchanged, and apostrophes retain their meaning.
-  if (result == HEARTNANO_E_OOV || result == NANO_LEX_E_NO_SYMBOLS) {
+  if (result == kErrorOov || result == NANO_LEX_E_NO_SYMBOLS) {
     bool changed = false;
     for (char* c = normalized; *c; ++c) {
       if (*c == '"') {

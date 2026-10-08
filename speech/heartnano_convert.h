@@ -4,10 +4,6 @@
 
 #include "nano_lex_g2p.h"
 
-#define HEARTNANO_MAX_IDS 207
-#define HEARTNANO_E_OOV (-101)
-#define HEARTNANO_E_DROPPED (-102)
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -18,7 +14,7 @@ extern "C" {
 // - Preserves IDs for supported ASCII text.
 // - Rejects invalid UTF-8, unsupported Unicode, and punctuation-only text.
 //
-// Limits: 512 UTF-8 input bytes; at most 207 output IDs.
+// Limits: NANO_LEX_MAX_CHARS input bytes; NANO_LEX_MAX_TOKENS output IDs.
 // capacity must be at least 2.
 //
 // Returns: an ID count or a negative frontend error. NANO_LEX_E_CAP means a
