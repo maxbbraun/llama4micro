@@ -28,3 +28,5 @@ add_executable_m7(llama4micro
 target_link_libraries(llama4micro
     libs_base-m7_freertos
 )
+
+target_compile_options(llama4micro PRIVATE -O3)
