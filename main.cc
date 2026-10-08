@@ -1,3 +1,4 @@
+#include <cstdio>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -17,6 +18,7 @@
 #include "third_party/tflite-micro/tensorflow/lite/micro/micro_mutable_op_resolver.h"
 
 #include "llama2.h"
+#include "speech/speech.h"
 #include "yolov8.h"
 
 using namespace coralmicro;
@@ -34,11 +36,11 @@ const char* kPromptPattern = "Once upon a time, there was a ";
 
 // Llama model data structures.
 Transformer transformer;
-std::vector<uint8_t>* llama_model_buffer;
+std::vector<uint8_t> llama_model_buffer;
 int group_size;
 int steps = kSteps;
 Tokenizer tokenizer;
-std::vector<uint8_t>* llama_tokenizer_buffer;
+std::vector<uint8_t> llama_tokenizer_buffer;
 Sampler sampler;
 
 // Vision model data path.
@@ -46,15 +48,18 @@ const char* kVisionModelPath = "/models/yolov8/yolov8n-int8_edgetpu.tflite";
 const char* kVisionLabelsPath = "/models/yolov8/coco_labels.txt";
 
 // Vision model data structures.
-std::vector<uint8_t>* vision_model_buffer;
-std::vector<std::string>* vision_labels;
-const size_t kTensorArenaSize = 320 * 1024;
-STATIC_TENSOR_ARENA_IN_SDRAM(tensor_arena, kTensorArenaSize);
+std::vector<uint8_t> vision_model_buffer;
+std::vector<std::string> vision_labels;
+const size_t kTensorArenaBytes = 320 * 1024;
+STATIC_TENSOR_ARENA_IN_SDRAM(tensor_arena, kTensorArenaBytes);
 PerformanceMode kTpuPerformanceMode = PerformanceMode::kLow;  // Fast enough.
+
+// Speech model data paths.
+const char* kSpeechFrontModelPath = "/models/sanotts/front_q8.bin";
+const char* kSpeechDecoderModelPath = "/models/sanotts/model_q8.bin";
 
 // Camera and object detection configuration.
 CameraFrameFormat frame_format;
-const int kDiscardFrames = 30;
 const float kConfidenceThreshold = 0.25f;
 const float kMinBboxSize = 0.1f;
 
@@ -66,16 +71,14 @@ void LoadLlamaModel() {
   int64_t timer_start = TimerMillis();
 
   printf(">>> Loading Llama model %s...\n", kLlamaModelPath);
-  llama_model_buffer = new std::vector<uint8_t>();
-  build_transformer(&transformer, kLlamaModelPath, llama_model_buffer,
+  build_transformer(&transformer, kLlamaModelPath, &llama_model_buffer,
                     &group_size);
   if (steps == 0 || steps > transformer.config.seq_len) {
     steps = transformer.config.seq_len;
   }
 
   printf(">>> Loading Llama tokenizer %s...\n", kLlamaTokenizerPath);
-  llama_tokenizer_buffer = new std::vector<uint8_t>();
-  build_tokenizer(&tokenizer, kLlamaTokenizerPath, llama_tokenizer_buffer,
+  build_tokenizer(&tokenizer, kLlamaTokenizerPath, &llama_tokenizer_buffer,
                   transformer.config.vocab_size);
 
   unsigned long long rng_seed = xTaskGetTickCount();
@@ -87,26 +90,13 @@ void LoadLlamaModel() {
   printf(">>> Llama model loading took %.2f s\n", timer_s);
 }
 
-// Frees the memory associated with the Llama model.
-void UnloadLlamaModel() {
-  printf(">>> Unloading Llama model...\n");
-
-  free_sampler(&sampler);
-  free_tokenizer(&tokenizer);
-  free_transformer(&transformer);
-
-  delete llama_tokenizer_buffer;
-  delete llama_model_buffer;
-}
-
 // Loads the vision model and labels into memory.
 void LoadVisionModel() {
   int64_t timer_start = TimerMillis();
 
   // Load the model weights.
   printf(">>> Loading vision model %s...\n", kVisionModelPath);
-  vision_model_buffer = new std::vector<uint8_t>();
-  if (!LfsReadFile(kVisionModelPath, vision_model_buffer)) {
+  if (!LfsReadFile(kVisionModelPath, &vision_model_buffer)) {
     printf("ERROR: Failed to load vision model weights: %s\n",
            kVisionModelPath);
     return;
@@ -115,7 +105,6 @@ void LoadVisionModel() {
   // Load the model labels.
   printf(">>> Loading vision labels %s...\n", kVisionLabelsPath);
   std::string vision_labels_buffer;
-  vision_labels = new std::vector<std::string>();
   if (!LfsReadFile(kVisionLabelsPath, &vision_labels_buffer)) {
     printf("ERROR: Failed to load vision labels: %s\n", kVisionLabelsPath);
     return;
@@ -123,7 +112,7 @@ void LoadVisionModel() {
   std::istringstream labels_stream(vision_labels_buffer);
   std::string label;
   while (std::getline(labels_stream, label)) {
-    vision_labels->push_back(label);
+    vision_labels.push_back(label);
   }
 
   int64_t timer_stop = TimerMillis();
@@ -131,12 +120,14 @@ void LoadVisionModel() {
   printf(">>> Vision model loading took %.2f s\n", timer_s);
 }
 
-// Frees the memory associated with the vision model.
-void UnloadVisionModel() {
-  printf(">>> Unloading vision model...\n");
-
-  delete vision_model_buffer;
-  delete vision_labels;
+// Loads the speech model weights into memory.
+void LoadSpeechModel() {
+  int64_t timer_start = TimerMillis();
+  if (!speech::LoadModel(kSpeechFrontModelPath, kSpeechDecoderModelPath)) {
+    return;
+  }
+  float timer_s = (TimerMillis() - timer_start) / 1000.0f;
+  printf(">>> Speech model loading took %.2f s\n", timer_s);
 }
 
 // Takes a picture and returns the label of the main detected object.
@@ -166,8 +157,8 @@ std::string TakePicture() {
   MicroMutableOpResolver<1> tf_resolver;
   tf_resolver.AddCustom(kCustomOp, RegisterCustomOp());
   MicroErrorReporter tf_error_reporter;
-  MicroInterpreter tf_interpreter(GetModel(vision_model_buffer->data()),
-                                  tf_resolver, tensor_arena, kTensorArenaSize,
+  MicroInterpreter tf_interpreter(GetModel(vision_model_buffer.data()),
+                                  tf_resolver, tensor_arena, kTensorArenaBytes,
                                   &tf_error_reporter);
   if (tf_interpreter.AllocateTensors() != kTfLiteOk) {
     printf("ERROR: Failed to allocate tensors\n");
@@ -204,7 +195,7 @@ std::string TakePicture() {
 
   // Process the results.
   auto results = yolo::GetDetectionResults(
-      &tf_interpreter, kConfidenceThreshold, kMinBboxSize, vision_labels);
+      &tf_interpreter, kConfidenceThreshold, kMinBboxSize, &vision_labels);
   if (results.empty()) {
     printf(">>> Found no objects\n");
     return "";
@@ -227,19 +218,29 @@ void TellStory(std::string prompt) {
   printf(">>> Generating tokens...\n");
 
   float tokens_s;
+  speech::BeginAsync();
   generate(&transformer, &tokenizer, &sampler, prompt.c_str(), steps,
-           group_size, &tokens_s);
+           group_size, &tokens_s, speech::Append);
+  if (!speech::Flush()) {
+    printf("ERROR: Failed to play story\n");
+  }
 
   printf(">>> Averaged %.2f tokens/s\n", tokens_s);
 }
 
 extern "C" [[noreturn]] void app_main(void* param) {
   (void)param;
+  setvbuf(stdout, nullptr, _IONBF, 0);
 
   // Set up the button interrupt.
+  const TaskHandle_t app_task = xTaskGetCurrentTaskHandle();
   GpioConfigureInterrupt(
       Gpio::kUserButton, GpioInterruptMode::kIntModeFalling,
-      [handle = xTaskGetCurrentTaskHandle()]() { xTaskResumeFromISR(handle); },
+      [app_task]() {
+        BaseType_t woken = pdFALSE;
+        vTaskNotifyGiveFromISR(app_task, &woken);
+        portYIELD_FROM_ISR(woken);
+      },
       kButtonDebounceUs);
 
   // Load the models while showing the status LED.
@@ -247,12 +248,14 @@ extern "C" [[noreturn]] void app_main(void* param) {
   LedSet(Led::kUser, false);
   LoadLlamaModel();
   LoadVisionModel();
+  LoadSpeechModel();
 
   while (true) {
-    // Wait for a button press while showing the user LED.
+    // Ignore presses during the previous story, then wait for a new one.
+    ulTaskNotifyTake(pdTRUE, 0);
     LedSet(Led::kStatus, false);
     LedSet(Led::kUser, true);
-    vTaskSuspend(nullptr);
+    ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
     // Continuing here after the button interrupt.
 
     // Take a picture while (automatically) showing the camera LED. The result
@@ -273,8 +276,4 @@ extern "C" [[noreturn]] void app_main(void* param) {
     LedSet(Led::kUser, false);
     TellStory(prompt);
   }
-
-  // Unreachable in regular operation. The models stay in memory.
-  UnloadLlamaModel();
-  UnloadVisionModel();
 }

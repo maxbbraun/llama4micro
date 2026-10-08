@@ -1,0 +1,29 @@
+#pragma once
+
+#include <stdint.h>
+
+#include "nano_lex_g2p.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+// Converts text to Heartnano phoneme IDs.
+// - Normalizes supported Unicode punctuation and spacing.
+// - Uses the dictionary, then Flite for unknown English words.
+// - Preserves IDs for supported ASCII text.
+// - Rejects invalid UTF-8, unsupported Unicode, and punctuation-only text.
+//
+// Limits: NANO_LEX_MAX_CHARS input bytes; NANO_LEX_MAX_TOKENS output IDs.
+// capacity must be at least 2.
+//
+// Returns: an ID count or a negative frontend error. NANO_LEX_E_CAP means a
+// text, output, or workspace limit was exceeded; split the text and retry.
+// On failure, clears ids[0] if ids is non-null and capacity > 0.
+//
+// Threading: call from one task at a time; conversion uses shared buffers.
+int heartnano_text_to_ids(const char* text, int32_t* ids, int capacity);
+
+#ifdef __cplusplus
+}
+#endif
