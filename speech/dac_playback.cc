@@ -20,7 +20,9 @@ volatile bool g_done = true;
 bool g_initialized = false;
 
 void Init() {
-  if (g_initialized) return;
+  if (g_initialized) {
+    return;
+  }
 
   // Keep the same DAC reference selection as coralmicro::DacInit(). Enable the
   // analog output buffer to drive the amplifier input and select fast settling.
@@ -50,10 +52,14 @@ void Init() {
 bool PlayCodes(const uint16_t* codes, size_t count) {
   constexpr uint32_t kSampleRateHz = dac_playback::kSampleRateHz;
   constexpr uint64_t kPlaybackTimeoutMarginUs = 2000000;
-  if (!codes || !count || !g_done) return false;
+  if (!codes || !count || !g_done) {
+    return false;
+  }
   Init();
   const uint32_t bus_hz = CLOCK_GetRootClockFreq(kCLOCK_Root_Bus);
-  if (!bus_hz || bus_hz % kSampleRateHz != 0) return false;
+  if (!bus_hz || bus_hz % kSampleRateHz != 0) {
+    return false;
+  }
   PIT_StopTimer(PIT1, kPIT_Chnl_0);
   PIT_DisableInterrupts(PIT1, kPIT_Chnl_0, kPIT_TimerInterruptEnable);
   PIT_ClearStatusFlags(PIT1, kPIT_Chnl_0, kPIT_TimerFlag);
@@ -127,10 +133,13 @@ namespace dac_playback {
 
 bool PlayPcm16(const int16_t* pcm, size_t samples) {
   if (!pcm || !samples ||
-      samples > std::numeric_limits<size_t>::max() / sizeof(uint16_t))
+      samples > std::numeric_limits<size_t>::max() / sizeof(uint16_t)) {
     return false;
+  }
   auto* codes = static_cast<uint16_t*>(malloc(samples * sizeof(uint16_t)));
-  if (!codes) return false;
+  if (!codes) {
+    return false;
+  }
 
   for (size_t i = 0; i < samples; ++i) {
     codes[i] = Code(pcm[i] / 32768.0f * Fade(i, samples, kSampleRateHz));

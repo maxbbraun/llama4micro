@@ -92,9 +92,13 @@ struct Capture {
 
 int CapturePcm(const float* pcm, int n, void* user) {
   auto* c = static_cast<Capture*>(user);
-  if (n < 0 || c->count + static_cast<size_t>(n) > kMaxSamples) return 1;
+  if (n < 0 || c->count + static_cast<size_t>(n) > kMaxSamples) {
+    return 1;
+  }
   for (int i = 0; i < n; ++i) {
-    if (!std::isfinite(pcm[i])) return 1;
+    if (!std::isfinite(pcm[i])) {
+      return 1;
+    }
     const float bounded = std::max(-1.0f, std::min(1.0f, pcm[i]));
     c->pcm[c->count++] = static_cast<int16_t>(std::lrintf(bounded * 32767));
   }
@@ -104,8 +108,9 @@ int CapturePcm(const float* pcm, int n, void* user) {
 bool HasWord(const char* s) {
   for (; *s; ++s) {
     if ((*s >= 'A' && *s <= 'Z') || (*s >= 'a' && *s <= 'z') ||
-        (*s >= '0' && *s <= '9'))
+        (*s >= '0' && *s <= '9')) {
       return true;
+    }
   }
   return false;
 }
@@ -115,7 +120,9 @@ bool SayChunk(const std::string& text, int depth) {
     printf("ERROR: Speech model is not loaded.\n");
     return false;
   }
-  if (!HasWord(text.c_str())) return true;
+  if (!HasWord(text.c_str())) {
+    return true;
+  }
   int32_t ids[HEARTNANO_MAX_IDS];
   const int count = heartnano_text_to_ids(text.c_str(), ids, HEARTNANO_MAX_IDS);
   if (count < 0) {
@@ -123,7 +130,9 @@ bool SayChunk(const std::string& text, int depth) {
     // Retry smaller word-aligned pieces; never silently truncate the sentence.
     const size_t mid = text.size() / 2;
     size_t split = text.rfind(' ', mid);
-    if (split == std::string::npos || split == 0) split = text.find(' ', mid);
+    if (split == std::string::npos || split == 0) {
+      split = text.find(' ', mid);
+    }
     if (depth < 8 && split != std::string::npos && split > 0 &&
         split + 1 < text.size()) {
       const bool first = SayChunk(text.substr(0, split), depth + 1);
@@ -159,7 +168,9 @@ bool SayChunk(const std::string& text, int depth) {
     printf("ERROR: Speech synthesis failed (%d).\n", rc);
   } else {
     ok = dac_playback::PlayPcm16(capture.pcm, capture.count);
-    if (!ok) printf("ERROR: Speech playback failed.\n");
+    if (!ok) {
+      printf("ERROR: Speech playback failed.\n");
+    }
   }
   free(capture.pcm);
   return ok;
@@ -191,10 +202,15 @@ bool CreateWorker() {
   completion = xSemaphoreCreateBinaryStatic(&completion_storage);
   if (work_queue && completion &&
       xTaskCreate(Worker, "tts", kWorkerStackWords, nullptr, kWorkerPriority,
-                  &worker_task) == pdPASS)
+                  &worker_task) == pdPASS) {
     return true;
-  if (work_queue) vQueueDelete(work_queue);
-  if (completion) vSemaphoreDelete(completion);
+  }
+  if (work_queue) {
+    vQueueDelete(work_queue);
+  }
+  if (completion) {
+    vSemaphoreDelete(completion);
+  }
   work_queue = nullptr;
   completion = nullptr;
   worker_task = nullptr;
@@ -209,7 +225,9 @@ void QueueWork(const WorkItem& item) {
 }
 
 void SubmitChunk(const std::string& text) {
-  if (text.empty()) return;
+  if (text.empty()) {
+    return;
+  }
 
   // Append bounds each chunk before it gets here; copy into the queue, never
   // retain the tokenizer's temporary piece or a pointer into pending.
@@ -261,7 +279,9 @@ void BeginAsync() {
 
 void Append(const char* piece, void*) {
   configASSERT(producer_task == xTaskGetCurrentTaskHandle());
-  if (!piece) return;
+  if (!piece) {
+    return;
+  }
 
   // Decode may return multiple characters in one token. Preserve all of them.
   for (const char* p = piece; *p; ++p) {

@@ -15,12 +15,15 @@ int StrictTextToIds(const char* text, int32_t* ids, int capacity) {
   int result = nano_lex_g2p_text_to_ids(text, ids, cap);
   if (result >= 0) {
     nano_lex_g2p_get_stats(&local);
-    if (local.oov_words)
+    if (local.oov_words) {
       result = HEARTNANO_E_OOV;
-    else if (local.dropped)
+    } else if (local.dropped) {
       result = HEARTNANO_E_DROPPED;
+    }
   }
-  if (result < 0 && ids && capacity > 0) ids[0] = 0;
+  if (result < 0 && ids && capacity > 0) {
+    ids[0] = 0;
+  }
   return result;
 }
 
@@ -45,17 +48,23 @@ int Normalize(const char* text, size_t length) {
     } else if (lead >= 0xf0 && lead <= 0xf4) {
       width = 4;
       cp = lead & 0x07;
-    } else
+    } else {
       return NANO_LEX_E_BAD_UTF8;
-    if (pos + width > length) return NANO_LEX_E_BAD_UTF8;
+    }
+    if (pos + width > length) {
+      return NANO_LEX_E_BAD_UTF8;
+    }
     for (size_t i = 1; i < width; ++i) {
       const unsigned char next = static_cast<unsigned char>(text[pos + i]);
-      if ((next & 0xc0) != 0x80) return NANO_LEX_E_BAD_UTF8;
+      if ((next & 0xc0) != 0x80) {
+        return NANO_LEX_E_BAD_UTF8;
+      }
       cp = (cp << 6) | (next & 0x3f);
     }
     if ((width == 3 && cp < 0x800) || (width == 4 && cp < 0x10000) ||
-        (cp >= 0xd800 && cp <= 0xdfff) || cp > 0x10ffff)
+        (cp >= 0xd800 && cp <= 0xdfff) || cp > 0x10ffff) {
       return NANO_LEX_E_BAD_UTF8;
+    }
     pos += width;
     char replacement;
     if (cp == 0x2018 || cp == 0x2019 || cp == 0x201a || cp == 0x201b ||
@@ -91,21 +100,25 @@ bool HasPhoneme(const int32_t* ids, int count) {
   // IDs 13..53 and 56..58 are vowels/consonants in the 62-symbol voice.
   // Exclude framing, whitespace, punctuation, and stress-only markers.
   for (int i = 0; i < count; ++i) {
-    if ((ids[i] >= 13 && ids[i] <= 53) || (ids[i] >= 56 && ids[i] <= 58))
+    if ((ids[i] >= 13 && ids[i] <= 53) || (ids[i] >= 56 && ids[i] <= 58)) {
       return true;
+    }
   }
   return false;
 }
 
 int BoundedError(int error) {
   if (error == NANO_LEX_E_TEXT_LONG || error == NANO_LEX_E_TOKENS ||
-      error == NANO_LEX_E_ARENA)
+      error == NANO_LEX_E_ARENA) {
     return NANO_LEX_E_CAP;
+  }
   return error;
 }
 
 int Fail(int error, int32_t* ids, int capacity) {
-  if (ids && capacity > 0) ids[0] = 0;
+  if (ids && capacity > 0) {
+    ids[0] = 0;
+  }
   return BoundedError(error);
 }
 
@@ -113,13 +126,23 @@ int Fail(int error, int32_t* ids, int capacity) {
 
 extern "C" int heartnano_text_to_ids(const char* text, int32_t* ids,
                                      int capacity) {
-  if (!text || !ids) return Fail(NANO_LEX_E_NULL_ARG, ids, capacity);
-  if (capacity < 2) return Fail(NANO_LEX_E_BAD_CAP, ids, capacity);
+  if (!text || !ids) {
+    return Fail(NANO_LEX_E_NULL_ARG, ids, capacity);
+  }
+  if (capacity < 2) {
+    return Fail(NANO_LEX_E_BAD_CAP, ids, capacity);
+  }
   size_t length = 0;
-  while (length <= NANO_LEX_MAX_CHARS && text[length]) ++length;
-  if (length > NANO_LEX_MAX_CHARS) return Fail(NANO_LEX_E_CAP, ids, capacity);
+  while (length <= NANO_LEX_MAX_CHARS && text[length]) {
+    ++length;
+  }
+  if (length > NANO_LEX_MAX_CHARS) {
+    return Fail(NANO_LEX_E_CAP, ids, capacity);
+  }
   const int normalization = Normalize(text, length);
-  if (normalization < 0) return Fail(normalization, ids, capacity);
+  if (normalization < 0) {
+    return Fail(normalization, ids, capacity);
+  }
   nano_lex_g2p_set_fallback(flite_word_to_phonemes);
   int result = StrictTextToIds(normalized, ids, capacity);
 
@@ -133,10 +156,15 @@ extern "C" int heartnano_text_to_ids(const char* text, int32_t* ids,
         changed = true;
       }
     }
-    if (changed) result = StrictTextToIds(normalized, ids, capacity);
+    if (changed) {
+      result = StrictTextToIds(normalized, ids, capacity);
+    }
   }
-  if (result < 0) return Fail(result, ids, capacity);
-  if (!HasPhoneme(ids, result))
+  if (result < 0) {
+    return Fail(result, ids, capacity);
+  }
+  if (!HasPhoneme(ids, result)) {
     return Fail(NANO_LEX_E_NO_SYMBOLS, ids, capacity);
+  }
   return result;
 }
