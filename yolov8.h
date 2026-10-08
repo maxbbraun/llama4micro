@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <numeric>
 #include <string>
 #include <vector>
 
@@ -36,21 +37,29 @@ inline float IntersectionOverUnion(const Object& a, const Object& b) {
 
 // Performs non-maximum suppression on a list of objects.
 std::vector<Object> NonMaximumSuppression(const std::vector<Object>& objects) {
+  std::vector<size_t> sorted_indices(objects.size());
+  std::iota(sorted_indices.begin(), sorted_indices.end(), size_t{0});
+
+  // Prefer confidence, then area, then the earlier input.
+  std::sort(sorted_indices.begin(), sorted_indices.end(),
+            [&objects](size_t index_a, size_t index_b) {
+              const Object& a = objects[index_a];
+              const Object& b = objects[index_b];
+              if (a.confidence != b.confidence) {
+                return a.confidence > b.confidence;
+              }
+              const float area_a = a.width * a.height;
+              const float area_b = b.width * b.height;
+              return area_a != area_b ? area_a > area_b : index_a < index_b;
+            });
   std::vector<Object> final_objects;
 
-  for (size_t index_a = 0; index_a < objects.size(); ++index_a) {
-    const Object& object_a = objects[index_a];
+  for (size_t index : sorted_indices) {
+    const Object& object_a = objects[index];
 
-    // Compare each object to all others to determine whether to keep it.
+    // Only retained higher-priority detections can suppress this object.
     bool discard_a = false;
-    for (size_t index_b = 0; index_b < objects.size(); ++index_b) {
-      const Object& object_b = objects[index_b];
-
-      // Don't compare the object to itself.
-      if (index_a == index_b) {
-        continue;
-      }
-
+    for (const Object& object_b : final_objects) {
       // Only compare objects with the same label.
       if (object_a.label != object_b.label) {
         continue;
@@ -58,21 +67,6 @@ std::vector<Object> NonMaximumSuppression(const std::vector<Object>& objects) {
 
       // Scrutinize object pairs with overlapping bounding boxes.
       if (IntersectionOverUnion(object_a, object_b) > kNmsIouThreshold) {
-        // Keep the object if it has the highest confidence.
-        if (object_a.confidence > object_b.confidence) {
-          continue;
-        }
-
-        // Break confidence ties by area, then prefer the earlier input.
-        if (object_a.confidence == object_b.confidence) {
-          const float area_a = object_a.width * object_a.height;
-          const float area_b = object_b.width * object_b.height;
-          if (area_a > area_b || (area_a == area_b && index_a < index_b)) {
-            continue;
-          }
-        }
-
-        // Otherwise, discard the object.
         discard_a = true;
         break;
       }
