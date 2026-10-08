@@ -23,7 +23,7 @@ struct Object {
 };
 
 // Calculates the intersection over union of two objects' bounding boxes.
-inline float IntersectionOverUnion(Object& a, Object& b) {
+inline float IntersectionOverUnion(const Object& a, const Object& b) {
   float intersection_width = std::max(
       0.0f, std::min(a.x + a.width, b.x + b.width) - std::max(a.x, b.x));
   float intersection_height = std::max(
@@ -35,16 +35,16 @@ inline float IntersectionOverUnion(Object& a, Object& b) {
 }
 
 // Performs non-maximum suppression on a list of objects.
-std::vector<Object> NonMaximumSuppression(std::vector<Object>& objects) {
+std::vector<Object> NonMaximumSuppression(const std::vector<Object>& objects) {
   std::vector<Object> final_objects;
 
   for (size_t index_a = 0; index_a < objects.size(); ++index_a) {
-    Object object_a = objects[index_a];
+    const Object& object_a = objects[index_a];
 
     // Compare each object to all others to determine whether to keep it.
     bool discard_a = false;
     for (size_t index_b = 0; index_b < objects.size(); ++index_b) {
-      Object object_b = objects[index_b];
+      const Object& object_b = objects[index_b];
 
       // Don't compare the object to itself.
       if (index_a == index_b) {
