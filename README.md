@@ -63,6 +63,8 @@ python ../coralmicro/scripts/flashtool.py \
     --elf_path llama4micro
 ```
 
+![setup](llama4micro.jpg)
+
 ## Usage
 
 1. The models load automatically when the board powers up.
