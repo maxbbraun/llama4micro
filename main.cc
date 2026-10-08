@@ -146,14 +146,13 @@ void UnloadVisionModel() {
 }
 
 // Loads the speech model weights into memory.
-bool LoadSpeechModel() {
+void LoadSpeechModel() {
   int64_t timer_start = TimerMillis();
   if (!speech::LoadModel(kSpeechFrontModelPath, kSpeechDecoderModelPath)) {
-    return false;
+    return;
   }
   float timer_s = (TimerMillis() - timer_start) / 1000.0f;
   printf(">>> Speech model loading took %.2f s\n", timer_s);
-  return true;
 }
 
 // Takes a picture and returns the label of the main detected object.
@@ -274,10 +273,7 @@ extern "C" [[noreturn]] void app_main(void* param) {
   LedSet(Led::kUser, false);
   LoadLlamaModel();
   LoadVisionModel();
-  if (!LoadSpeechModel()) {
-    // Keep the status LED on; reset to retry speech initialization.
-    while (true) vTaskDelay(pdMS_TO_TICKS(1000));
-  }
+  LoadSpeechModel();
 
   while (true) {
     // Ignore presses during the previous story, then wait for a new one.
