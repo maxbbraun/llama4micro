@@ -3,7 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 
-namespace dac_playback {
+namespace speech {
 
 constexpr uint32_t kSampleRateHz = 24000;
 
@@ -12,4 +12,4 @@ constexpr uint32_t kSampleRateHz = 24000;
 // over 5 ms. Returns false on invalid input, allocation failure, or timeout.
 bool PlayPcm16(const int16_t* pcm, size_t samples);
 
-}  // namespace dac_playback
+}  // namespace speech

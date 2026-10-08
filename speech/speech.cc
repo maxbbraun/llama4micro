@@ -29,7 +29,7 @@ extern "C" int64_t snt_now_us() { return coralmicro::TimerMicros(); }
 namespace {
 
 constexpr size_t kArenaBytes = 1024 * 1024;
-constexpr uint32_t kSampleRateHz = dac_playback::kSampleRateHz;
+constexpr uint32_t kSampleRateHz = speech::kSampleRateHz;
 constexpr size_t kMaxAudioDurationSeconds = 24;
 constexpr size_t kMaxSamples = kMaxAudioDurationSeconds * kSampleRateHz;
 constexpr size_t kChunkBytes = 120;
@@ -168,7 +168,7 @@ bool SayChunk(const std::string& text, int depth) {
   if (!ok) {
     printf("ERROR: Speech synthesis failed (%d).\n", rc);
   } else {
-    ok = dac_playback::PlayPcm16(capture.pcm, capture.count);
+    ok = speech::PlayPcm16(capture.pcm, capture.count);
     if (!ok) {
       printf("ERROR: Speech playback failed.\n");
     }
