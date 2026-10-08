@@ -63,11 +63,13 @@ std::vector<Object> NonMaximumSuppression(std::vector<Object>& objects) {
           continue;
         }
 
-        // Keep the object if confidences are tied and it has a larger area.
-        if (object_a.confidence == object_b.confidence &&
-            object_a.width * object_a.height >
-                object_b.width * object_b.height) {
-          continue;
+        // Break confidence ties by area, then prefer the earlier input.
+        if (object_a.confidence == object_b.confidence) {
+          const float area_a = object_a.width * object_a.height;
+          const float area_b = object_b.width * object_b.height;
+          if (area_a > area_b || (area_a == area_b && index_a < index_b)) {
+            continue;
+          }
         }
 
         // Otherwise, discard the object.
