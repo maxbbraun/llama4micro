@@ -12,8 +12,6 @@ set(CMAKE_CXX_STANDARD_REQUIRED True)
 include_directories(coralmicro)
 add_subdirectory(coralmicro)
 
-include_directories(llama2.c)
-
 add_executable_m7(llama4micro
     main.cc
     speech/speech.cc
