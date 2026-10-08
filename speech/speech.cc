@@ -288,7 +288,8 @@ void Append(const char* piece) {
   for (const char* p = piece; *p; ++p) {
     // Wait for the next character, even across callbacks, to distinguish a
     // sentence-ending period from a decimal point (including leading .5).
-    if (!pending.empty() && pending.back() == '.' && (*p < '0' || *p > '9')) {
+    if (!pending.empty() && pending.back() == '.' &&
+        !std::isdigit(static_cast<unsigned char>(*p))) {
       SubmitPending();
     }
     pending += *p;

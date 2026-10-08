@@ -1,6 +1,8 @@
 #include "flite_phonemes.h"
 
+#include <algorithm>
 #include <cstring>
+#include <iterator>
 
 #include "nano_lex_g2p.h"
 #include "nano_lex_tables.h"
@@ -18,8 +20,7 @@ constexpr size_t kMaxWordChars = 64;
 constexpr size_t kNodeBytes = 6;
 constexpr size_t kMaxDecisionSteps = 256;
 constexpr size_t kModelNodes = sizeof(cmu_lts_model) / kNodeBytes;
-constexpr size_t kPhoneRows =
-    sizeof(cmu_lts_phone_table) / sizeof(cmu_lts_phone_table[0]) - 1;
+constexpr size_t kPhoneRows = std::size(cmu_lts_phone_table) - 1;
 static_assert(sizeof(cmu_lts_model) % kNodeBytes == 0,
               "Flite decision nodes must contain six bytes");
 
@@ -81,15 +82,13 @@ int AppendPhones(const char* label, uint8_t* phones, size_t capacity,
     if (length < 1 || length > 2) {
       return NANO_LEX_E_INTERNAL;
     }
-    const Phone* match = nullptr;
-    for (const Phone& phone : kPhones) {
-      if (phone.name[length] == '\0' &&
-          std::strncmp(phone.name, label, length) == 0) {
-        match = &phone;
-        break;
-      }
-    }
-    if (!match) {
+    const Phone* match =
+        std::find_if(std::begin(kPhones), std::end(kPhones),
+                     [label, length](const Phone& phone) {
+                       return phone.name[length] == '\0' &&
+                              std::strncmp(phone.name, label, length) == 0;
+                     });
+    if (match == std::end(kPhones)) {
       return NANO_LEX_E_INTERNAL;
     }
     uint8_t code = match->code;
@@ -174,10 +173,8 @@ extern "C" int flite_word_to_phonemes(const uint16_t* word, size_t length,
       continue;
     }
     uint8_t features[9];
-    for (size_t j = 0; j < 4; ++j) {
-      features[j] = static_cast<uint8_t>(padded[i + j]);
-      features[j + 4] = static_cast<uint8_t>(padded[i + 5 + j]);
-    }
+    std::copy_n(padded + i, 4, features);
+    std::copy_n(padded + i + 5, 4, features + 4);
     features[8] = '0';
     size_t state = cmu_lts_letter_index[padded[i + 4] - 'a'];
     size_t steps = 0;
@@ -190,7 +187,7 @@ extern "C" int flite_word_to_phonemes(const uint16_t* word, size_t length,
       if (node[0] == 255) {
         break;
       }
-      if (node[0] >= sizeof(features)) {
+      if (node[0] >= std::size(features)) {
         return Fail(NANO_LEX_E_INTERNAL, phones, capacity);
       }
       const size_t branch = features[node[0]] == node[1] ? 2 : 4;

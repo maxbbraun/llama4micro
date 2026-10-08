@@ -2,6 +2,8 @@
 
 #include <stddef.h>
 
+#include <algorithm>
+
 #include "flite_phonemes.h"
 
 namespace {
@@ -14,7 +16,7 @@ char normalized[NANO_LEX_MAX_CHARS + 1];
 // Reject partial conversions rather than silently omitting words or sounds.
 int StrictTextToIds(const char* text, int32_t* ids, int capacity) {
   nano_lex_g2p_stats_t local = {};
-  int cap = capacity > NANO_LEX_MAX_TOKENS ? NANO_LEX_MAX_TOKENS : capacity;
+  int cap = std::min(capacity, NANO_LEX_MAX_TOKENS);
   int result = nano_lex_g2p_text_to_ids(text, ids, cap);
   if (result >= 0) {
     nano_lex_g2p_get_stats(&local);
@@ -99,12 +101,9 @@ int Normalize(const char* text, size_t length) {
 bool HasPhoneme(const int32_t* ids, int count) {
   // IDs 13..53 and 56..58 are vowels/consonants in the 62-symbol voice.
   // Exclude framing, whitespace, punctuation, and stress-only markers.
-  for (int i = 0; i < count; ++i) {
-    if ((ids[i] >= 13 && ids[i] <= 53) || (ids[i] >= 56 && ids[i] <= 58)) {
-      return true;
-    }
-  }
-  return false;
+  return std::any_of(ids, ids + count, [](int32_t id) {
+    return (id >= 13 && id <= 53) || (id >= 56 && id <= 58);
+  });
 }
 
 int BoundedError(int error) {
