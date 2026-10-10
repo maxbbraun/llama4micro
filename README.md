@@ -2,14 +2,14 @@
 
 A "large" language model running on a microcontroller.
 
-![Example run](llama4micro.gif)
+![Example run](media/llama4micro.gif)
 
 ## Background
 
 I was wondering if it's possible to fit a non-trivial language model on a microcontroller. Turns out the answer is some version of yes!
 
 > [!WARNING]
-> Later, things got a bit out of hand and now the prompt is based on objects detected by the camera, and a text-to-speech model [reads the story out loud](llama4micro.mp3).
+> Later, things got a bit out of hand and now the prompt is based on objects detected by the camera, and a text-to-speech model [reads the story out loud](media/llama4micro.mp3).
 
 This project is using the [Coral Dev Board Micro](https://coral.ai/products/dev-board-micro) with its [FreeRTOS toolchain](https://coral.ai/docs/dev-board-micro/freertos/). The board has a number of neat [hardware features](https://coral.ai/docs/dev-board-micro/get-started/#the-hardware), but – most importantly for our purposes – it has 64MB of RAM. That's tiny for LLMs, which are typically measured in the GBs, but comparatively huge for a microcontroller.
 
@@ -56,14 +56,14 @@ Flash the image:
 python3 -m venv venv
 . venv/bin/activate
 
-pip install -r ../coralmicro/scripts/requirements.txt
+pip install -r ../third_party/coralmicro/scripts/requirements.txt
 
-python ../coralmicro/scripts/flashtool.py \
+python ../third_party/coralmicro/scripts/flashtool.py \
     --build_dir . \
     --elf_path llama4micro
 ```
 
-![setup](llama4micro.jpg)
+![setup](media/llama4micro.jpg)
 
 ## Usage
 

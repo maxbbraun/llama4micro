@@ -1,15 +1,15 @@
 [submodule "llama2.c"]
-	path = llama2.c
+	path = third_party/llama2.c
 	url = git@github.com:karpathy/llama2.c.git
 [submodule "coralmicro"]
-	path = coralmicro
+	path = third_party/coralmicro
 	url = git@github.com:google-coral/coralmicro.git
 [submodule "ultralytics"]
-	path = ultralytics
+	path = third_party/ultralytics
 	url = https://github.com/ultralytics/ultralytics.git
 [submodule "sanoTTS"]
-	path = sanoTTS
+	path = third_party/sanoTTS
 	url = https://github.com/Ampixa/sanoTTS.git
 [submodule "flite"]
-	path = flite
+	path = third_party/flite
 	url = https://github.com/festvox/flite.git
