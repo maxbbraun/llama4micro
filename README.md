@@ -46,7 +46,7 @@ Build the image:
 mkdir build
 cd build
 
-cmake ../source
+cmake ..
 make -j
 ```
 
