@@ -8,7 +8,6 @@ Some of the tools use Python. Install their dependencies:
 python3.12 -m venv venv
 . venv/bin/activate
 
-pip install -r ../third_party/llama2.c/requirements.txt
 pip install -r yolov8/requirements.txt
 ```
 
