@@ -8,7 +8,7 @@ Some of the tools use Python. Install their dependencies:
 python3.12 -m venv venv
 . venv/bin/activate
 
-pip install -r llama2.c/requirements.txt
+pip install -r third_party/llama2.c/requirements.txt
 pip install -r models/yolov8/requirements.txt
 ```
 
@@ -26,7 +26,7 @@ LLAMA_MODEL_DIR=llama2
 wget -P models/${LLAMA_MODEL_DIR} \
     https://huggingface.co/karpathy/tinyllamas/resolve/main/${LLAMA_MODEL_NAME}.pt
 
-python llama2.c/export.py \
+python third_party/llama2.c/export.py \
     models/${LLAMA_MODEL_DIR}/${LLAMA_MODEL_NAME}_q80.bin \
     --version 2 \
     --checkpoint models/${LLAMA_MODEL_DIR}/${LLAMA_MODEL_NAME}.pt
@@ -35,7 +35,7 @@ python llama2.c/export.py \
 The tokenizer comes from the [llama2.c](https://github.com/karpathy/llama2.c) repository.
 
 ```bash
-cp llama2.c/tokenizer.bin models/${LLAMA_MODEL_DIR}/
+cp third_party/llama2.c/tokenizer.bin models/${LLAMA_MODEL_DIR}/
 ```
 
 ### Vision
@@ -74,6 +74,6 @@ Speech uses the [heartnano](https://huggingface.co/ampixa/sanoTTS/tree/main/hear
 
 ```bash
 mkdir -p models/sanotts
-cp sanoTTS/web/voices/heartnano/front_q8.bin models/sanotts/
-cp sanoTTS/web/voices/heartnano/model_q8.bin models/sanotts/
+cp third_party/sanoTTS/web/voices/heartnano/front_q8.bin models/sanotts/
+cp third_party/sanoTTS/web/voices/heartnano/model_q8.bin models/sanotts/
 ```

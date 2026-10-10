@@ -21,7 +21,7 @@
 #include "third_party/tflite-micro/tensorflow/lite/micro/micro_mutable_op_resolver.h"
 
 #include "llama2.h"
-#include "speech/speech.h"
+#include "speech.h"
 #include "yolov8.h"
 
 using namespace coralmicro;
