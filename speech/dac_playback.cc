@@ -67,13 +67,18 @@ bool PlayCodes(const int16_t* codes, size_t count) {
   g_remaining = count;
   g_done = false;
   __DMB();
-  const uint64_t started = coralmicro::TimerMicros();
+
+  // Use the hardware counter's low word; the SDK's rollover bookkeeping can
+  // race. Unsigned subtraction handles wraparound for these short playbacks.
+  const uint32_t started_us = static_cast<uint32_t>(coralmicro::TimerMicros());
   const uint64_t timeout_us =
       static_cast<uint64_t>(count) * 1000000 / kSampleRateHz +
       kPlaybackTimeoutMarginUs;
   PIT_EnableInterrupts(PIT1, kPIT_Chnl_0, kPIT_TimerInterruptEnable);
   PIT_StartTimer(PIT1, kPIT_Chnl_0);
-  while (!g_done && coralmicro::TimerMicros() - started < timeout_us) {
+  while (!g_done &&
+         static_cast<uint32_t>(coralmicro::TimerMicros()) - started_us <
+             timeout_us) {
     vTaskDelay(pdMS_TO_TICKS(1));
   }
   PIT_StopTimer(PIT1, kPIT_Chnl_0);
