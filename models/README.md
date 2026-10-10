@@ -2,7 +2,7 @@
 
 This directory contains the pre-trained model weights and metadata. See instructions below about their origins.
 
-Run the following commands from `models/`. Some of the tools use Python. Install their dependencies:
+Some of the tools use Python. Install their dependencies:
 
 ```bash
 python3.12 -m venv venv
