@@ -1,6 +1,6 @@
 --extra-index-url https://download.pytorch.org/whl/cpu
 
-./third_party/ultralytics
+../third_party/ultralytics
 torch==2.8.0
 torchvision==0.23.0
 numpy==1.26.4

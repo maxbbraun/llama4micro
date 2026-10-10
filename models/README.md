@@ -2,14 +2,14 @@
 
 This directory contains the pre-trained model weights and metadata. See instructions below about their origins.
 
-Some of the tools use Python. Install their dependencies:
+Run the following commands from `models/`. Some of the tools use Python. Install their dependencies:
 
 ```bash
 python3.12 -m venv venv
 . venv/bin/activate
 
-pip install -r third_party/llama2.c/requirements.txt
-pip install -r models/yolov8/requirements.txt
+pip install -r ../third_party/llama2.c/requirements.txt
+pip install -r yolov8/requirements.txt
 ```
 
 [Install](https://coral.ai/docs/edgetpu/compiler/#download) Edge TPU Compiler 14.1.317412892.
@@ -23,19 +23,19 @@ The model used by [llama2.c](https://github.com/karpathy/llama2.c) is based on [
 LLAMA_MODEL_NAME=stories15M
 LLAMA_MODEL_DIR=llama2
 
-wget -P models/${LLAMA_MODEL_DIR} \
+wget -P ${LLAMA_MODEL_DIR} \
     https://huggingface.co/karpathy/tinyllamas/resolve/main/${LLAMA_MODEL_NAME}.pt
 
-python third_party/llama2.c/export.py \
-    models/${LLAMA_MODEL_DIR}/${LLAMA_MODEL_NAME}_q80.bin \
+python ../third_party/llama2.c/export.py \
+    ${LLAMA_MODEL_DIR}/${LLAMA_MODEL_NAME}_q80.bin \
     --version 2 \
-    --checkpoint models/${LLAMA_MODEL_DIR}/${LLAMA_MODEL_NAME}.pt
+    --checkpoint ${LLAMA_MODEL_DIR}/${LLAMA_MODEL_NAME}.pt
 ```
 
 The tokenizer comes from the [llama2.c](https://github.com/karpathy/llama2.c) repository.
 
 ```bash
-cp third_party/llama2.c/tokenizer.bin models/${LLAMA_MODEL_DIR}/
+cp ../third_party/llama2.c/tokenizer.bin ${LLAMA_MODEL_DIR}/
 ```
 
 ### Vision
@@ -45,17 +45,17 @@ Object detection (with labels used for prompting Llama) uses [YOLOv8n](https://g
 Export the [pretrained weights](https://github.com/ultralytics/assets/releases/download/v8.3.0/yolov8n.pt):
 
 ```bash
-pip install -r models/yolov8/requirements.txt
+pip install -r yolov8/requirements.txt
 
-mkdir -p build/yolov8
-wget -O build/yolov8/yolov8n.pt \
+mkdir -p ../build/yolov8
+wget -O ../build/yolov8/yolov8n.pt \
     https://github.com/ultralytics/assets/releases/download/v8.3.0/yolov8n.pt
-wget -O build/yolov8/coco128.zip \
+wget -O ../build/yolov8/coco128.zip \
     https://github.com/ultralytics/assets/releases/download/v0.0.0/coco128.zip
-python -m zipfile -e build/yolov8/coco128.zip build/yolov8/calibration
+python -m zipfile -e ../build/yolov8/coco128.zip ../build/yolov8/calibration
 
-python models/export_yolov8.py
-cd build/yolov8
+python export_yolov8.py
+cd ../build/yolov8
 TF_NUM_INTRAOP_THREADS=4 TF_NUM_INTEROP_THREADS=2 OMP_NUM_THREADS=4 \
 python -m onnx2tf \
     -i yolov8n.onnx -o tflite -oiqt \
@@ -64,8 +64,8 @@ python -m onnx2tf \
 mkdir -p edgetpu
 edgetpu_compiler --show_operations --out_dir edgetpu \
     tflite/yolov8n_full_integer_quant.tflite
-cd ../..
-python -c 'from models.export_yolov8 import install_model; install_model()'
+cd ../../models
+python -c 'from export_yolov8 import install_model; install_model()'
 ```
 
 ### Speech
@@ -73,7 +73,7 @@ python -c 'from models.export_yolov8 import install_model; install_model()'
 Speech uses the [heartnano](https://huggingface.co/ampixa/sanoTTS/tree/main/heartnano) voice from [sanoTTS](https://github.com/Ampixa/sanoTTS), running on the Arm Cortex-M7 CPU at a 24 kHz sample rate. The two weight files are copied from the pinned submodule.
 
 ```bash
-mkdir -p models/sanotts
-cp third_party/sanoTTS/web/voices/heartnano/front_q8.bin models/sanotts/
-cp third_party/sanoTTS/web/voices/heartnano/model_q8.bin models/sanotts/
+mkdir -p sanotts
+cp ../third_party/sanoTTS/web/voices/heartnano/front_q8.bin sanotts/
+cp ../third_party/sanoTTS/web/voices/heartnano/model_q8.bin sanotts/
 ```
