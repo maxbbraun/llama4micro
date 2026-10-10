@@ -831,7 +831,8 @@ int sample(Sampler* sampler, float* logits) {
 
 void generate(Transformer *transformer, Tokenizer *tokenizer, Sampler *sampler, const char *prompt,
               int steps, int GA, float* tokens_s,
-              void (*token_callback)(const char*) = nullptr) {
+              void (*token_callback)(const char*) = nullptr,
+              bool (*should_stop)() = nullptr) {
     const char *empty_prompt = "";
     if (prompt == NULL) { prompt = empty_prompt; }
 
@@ -849,7 +850,7 @@ void generate(Transformer *transformer, Tokenizer *tokenizer, Sampler *sampler, 
     int next;        // will store the next token in the sequence
     int token = prompt_tokens[0]; // kick off with the first token in the prompt
     int pos = 0;     // position in the sequence
-    while (pos < steps) {
+    while (pos < steps && !(should_stop && should_stop())) {
 
         // forward the transformer to get logits for the next token
         float* logits = forward(transformer, token, pos, GA);

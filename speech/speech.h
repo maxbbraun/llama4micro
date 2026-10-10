@@ -12,12 +12,19 @@ bool LoadModel(const char* front_path, const char* decoder_path);
 // chunks ahead of playback and lowers the producer priority until Flush.
 void BeginAsync();
 
+// Request cancellation from another task. Flush must still finish the batch.
+void Cancel();
+
+// Whether this story was cancelled; reset by the next BeginAsync.
+bool Cancelled();
+
 // Append a tokenizer piece, submitting complete sentences or bounded chunks.
 // Copies text before returning; may block while speech catches up.
 void Append(const char* piece);
 
-// Submit the final partial sentence and wait until all audio has played.
-// Restores the producer priority and reports any synthesis/playback failure.
+// Submit the final partial sentence and wait for playback or cancellation
+// cleanup. Restores the producer priority and reports any synthesis/playback
+// failure.
 bool Flush();
 
 }  // namespace speech

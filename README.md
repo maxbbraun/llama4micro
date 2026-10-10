@@ -76,6 +76,7 @@ python ../coralmicro/scripts/flashtool.py \
 3. The model now generates a story starting with a prompt based on the object.
    - Sentences are spoken using text to speech while the story is being generated.
    - The story is also streamed to the serial port.
+   - Hold the button for one second to cancel generation and playback.
 4. Generation stops after the end token or maximum steps, and playback finishes.
    - The green light will turn on again.
    - Goto 2.
