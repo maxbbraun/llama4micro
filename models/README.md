@@ -8,6 +8,7 @@ Some of the tools use Python. Install their dependencies:
 python3.12 -m venv venv
 . venv/bin/activate
 
+pip install -r llama2/requirements.txt
 pip install -r yolov8/requirements.txt
 ```
 
@@ -44,8 +45,6 @@ Object detection (with labels used for prompting Llama) uses [YOLOv8n](https://g
 Export the [pretrained weights](https://github.com/ultralytics/assets/releases/download/v8.3.0/yolov8n.pt):
 
 ```bash
-pip install -r yolov8/requirements.txt
-
 mkdir -p ../build/yolov8
 wget -O ../build/yolov8/yolov8n.pt \
     https://github.com/ultralytics/assets/releases/download/v8.3.0/yolov8n.pt
